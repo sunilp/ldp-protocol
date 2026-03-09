@@ -1,0 +1,128 @@
+[
+  {
+    "_comment": "Step 1: Initiator sends HELLO",
+    "message_id": "msg-001",
+    "session_id": "",
+    "from": "ldp:delegate:router-alpha",
+    "to": "ldp:delegate:qwen3-8b-reasoning",
+    "body": {
+      "type": "HELLO",
+      "delegate_id": "ldp:delegate:router-alpha",
+      "supported_modes": ["semantic_frame", "text"]
+    },
+    "payload_mode": "text",
+    "timestamp": "2026-03-09T10:00:00Z",
+    "provenance": null
+  },
+  {
+    "_comment": "Step 2: Responder sends CAPABILITY_MANIFEST",
+    "message_id": "msg-002",
+    "session_id": "",
+    "from": "ldp:delegate:qwen3-8b-reasoning",
+    "to": "ldp:delegate:router-alpha",
+    "body": {
+      "type": "CAPABILITY_MANIFEST",
+      "capabilities": {
+        "skills": ["reasoning", "analysis"],
+        "supported_modes": ["semantic_frame", "text"],
+        "max_concurrent_tasks": 4
+      }
+    },
+    "payload_mode": "text",
+    "timestamp": "2026-03-09T10:00:01Z",
+    "provenance": null
+  },
+  {
+    "_comment": "Step 3: Initiator proposes session",
+    "message_id": "msg-003",
+    "session_id": "",
+    "from": "ldp:delegate:router-alpha",
+    "to": "ldp:delegate:qwen3-8b-reasoning",
+    "body": {
+      "type": "SESSION_PROPOSE",
+      "config": {
+        "preferred_payload_modes": ["semantic_frame", "text"],
+        "ttl_secs": 3600,
+        "required_trust_domain": "research.internal"
+      }
+    },
+    "payload_mode": "text",
+    "timestamp": "2026-03-09T10:00:02Z",
+    "provenance": null
+  },
+  {
+    "_comment": "Step 4: Responder accepts with negotiated mode",
+    "message_id": "msg-004",
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "from": "ldp:delegate:qwen3-8b-reasoning",
+    "to": "ldp:delegate:router-alpha",
+    "body": {
+      "type": "SESSION_ACCEPT",
+      "session_id": "550e8400-e29b-41d4-a716-446655440000",
+      "negotiated_mode": "semantic_frame"
+    },
+    "payload_mode": "text",
+    "timestamp": "2026-03-09T10:00:03Z",
+    "provenance": null
+  },
+  {
+    "_comment": "Step 5: Submit task using negotiated semantic frame mode",
+    "message_id": "msg-005",
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "from": "ldp:delegate:router-alpha",
+    "to": "ldp:delegate:qwen3-8b-reasoning",
+    "body": {
+      "type": "TASK_SUBMIT",
+      "task_id": "task-001",
+      "skill": "reasoning",
+      "input": {
+        "task_type": "analysis",
+        "instruction": "Compare the tradeoffs between microservices and monolithic architectures for a team of 5 engineers",
+        "expected_output_format": "structured_analysis"
+      }
+    },
+    "payload_mode": "semantic_frame",
+    "timestamp": "2026-03-09T10:00:04Z",
+    "provenance": null
+  },
+  {
+    "_comment": "Step 6: Task result with provenance",
+    "message_id": "msg-006",
+    "session_id": "550e8400-e29b-41d4-a716-446655440000",
+    "from": "ldp:delegate:qwen3-8b-reasoning",
+    "to": "ldp:delegate:router-alpha",
+    "body": {
+      "type": "TASK_RESULT",
+      "task_id": "task-001",
+      "output": {
+        "analysis": "For a team of 5 engineers, a modular monolith is recommended...",
+        "tradeoffs": [
+          {"factor": "deployment complexity", "microservices": "high", "monolith": "low"},
+          {"factor": "team cognitive load", "microservices": "high", "monolith": "medium"},
+          {"factor": "scaling flexibility", "microservices": "high", "monolith": "medium"}
+        ],
+        "recommendation": "modular_monolith"
+      },
+      "provenance": {
+        "produced_by": "ldp:delegate:qwen3-8b-reasoning",
+        "model_version": "qwen3-8b-2026.01",
+        "payload_mode_used": "semantic_frame",
+        "confidence": 0.82,
+        "verified": false,
+        "session_id": "550e8400-e29b-41d4-a716-446655440000",
+        "timestamp": "2026-03-09T10:00:09Z"
+      }
+    },
+    "payload_mode": "semantic_frame",
+    "timestamp": "2026-03-09T10:00:09Z",
+    "provenance": {
+      "produced_by": "ldp:delegate:qwen3-8b-reasoning",
+      "model_version": "qwen3-8b-2026.01",
+      "payload_mode_used": "semantic_frame",
+      "confidence": 0.82,
+      "verified": false,
+      "session_id": "550e8400-e29b-41d4-a716-446655440000",
+      "timestamp": "2026-03-09T10:00:09Z"
+    }
+  }
+]

@@ -1,0 +1,35 @@
+{
+  "delegate_id": "ldp:delegate:qwen3-8b-reasoning",
+  "name": "Qwen3 8B Reasoning Specialist",
+  "description": "Deep analytical reasoning and multi-step analysis",
+  "model_family": "qwen",
+  "model_version": "qwen3-8b-2026.01",
+  "weights_fingerprint": "sha256:a1b2c3d4e5f6...",
+  "trust_domain": {
+    "name": "research.internal",
+    "allow_cross_domain": false,
+    "trusted_peers": []
+  },
+  "context_window": 32768,
+  "reasoning_profile": "deep-analytical",
+  "cost_profile": "medium",
+  "latency_profile": "p50:5000ms",
+  "jurisdiction": "in-west",
+  "capabilities": [
+    {
+      "name": "reasoning",
+      "quality_hint": 0.85,
+      "latency_hint_ms_p50": 5000,
+      "cost_hint": "medium"
+    },
+    {
+      "name": "analysis",
+      "quality_hint": 0.82,
+      "latency_hint_ms_p50": 4500,
+      "cost_hint": "medium"
+    }
+  ],
+  "supported_payload_modes": ["semantic_frame", "text"],
+  "endpoint": "ldp://localhost:8080/delegates/qwen3-8b",
+  "metadata": {}
+}

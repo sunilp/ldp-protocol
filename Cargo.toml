@@ -1,0 +1,45 @@
+[package]
+name = "ldp-protocol"
+description = "LDP — LLM Delegate Protocol: identity-aware communication for multi-agent LLM systems"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/sunilp/ldp-protocol"
+keywords = ["llm", "agents", "protocol", "delegation", "multi-agent"]
+categories = ["network-programming", "web-programming"]
+publish = false
+
+[dependencies]
+# JamJet dependencies (path references — adjust if needed)
+jamjet-protocols = { path = "../jamjet/runtime/protocols" }
+jamjet-agents = { path = "../jamjet/runtime/agents" }
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# HTTP client
+reqwest = { version = "0.11", default-features = false, features = ["json", "stream", "rustls-tls"] }
+
+# Error handling
+thiserror = "1"
+async-trait = "0.1"
+
+# IDs and time
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Tracing
+tracing = "0.1"
+
+# Misc
+futures = "0.3"
+sha2 = "0.10"
+async-stream = "0.3"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }
