@@ -155,7 +155,8 @@ src/
 
 - **[Protocol Specification (RFC)](docs/RFC.md)** — Formal protocol specification
 - **[Design Document](docs/DESIGN.md)** — JamJet integration architecture
-- **[Research Paper](https://github.com/sunilp/ldp-research)** — Empirical evaluation of LDP vs A2A
+- **[Research Paper](https://arxiv.org/abs/2603.08852v1)** — LDP: An Identity-Aware Protocol for Multi-Agent LLM Systems (arXiv:2603.08852)
+- **[Experiment Code](https://github.com/sunilp/ldp-research)** — Reproduce the empirical evaluation
 
 ## Research
 
@@ -166,7 +167,7 @@ LDP is backed by empirical research comparing it against A2A and random baseline
 - **Provenance:** Noisy confidence signals degrade quality below the no-provenance baseline — verification matters
 - **Sessions:** Governed sessions eliminate quadratic token overhead in multi-round delegation
 
-Full results, experiment code, and paper: [sunilp/ldp-research](https://github.com/sunilp/ldp-research)
+Full paper: [arXiv:2603.08852](https://arxiv.org/abs/2603.08852v1) | Experiment code: [sunilp/ldp-research](https://github.com/sunilp/ldp-research)
 
 ## License
 
