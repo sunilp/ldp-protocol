@@ -169,6 +169,11 @@ LDP is backed by empirical research comparing it against A2A and random baseline
 
 Full paper: [arXiv:2603.08852](https://arxiv.org/abs/2603.08852v1) | Experiment code: [sunilp/ldp-research](https://github.com/sunilp/ldp-research)
 
+### Related Writing
+
+- [Why Multi-Agent AI Systems Need Identity-Aware Routing](https://sunilprakash.com/writing/ldp-protocol/)
+- [From Debate to Deliberation: When Multi-Agent Reasoning Needs Structure](https://sunilprakash.com/writing/deliberative-collective-intelligence/)
+
 ## License
 
 Apache-2.0
