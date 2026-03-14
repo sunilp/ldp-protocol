@@ -3,3 +3,8 @@ Cargo.lock
 *.swp
 *.swo
 .DS_Store
+.venv/
+__pycache__/
+
+# Private planning docs (local only)
+/private/
