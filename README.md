@@ -4,7 +4,7 @@ An identity-aware communication protocol for multi-agent LLM systems.
 
 LDP extends service-oriented agent protocols (like [A2A](https://github.com/a2aproject/A2A) and [MCP](https://modelcontextprotocol.io/)) with AI-native primitives: rich delegate identity, progressive payload modes, governed sessions, structured provenance, and trust domains.
 
-**Install:** `pip install ldp-protocol` · **Paper:** [arXiv:2603.08852](https://arxiv.org/abs/2603.08852) · [PDF](https://arxiv.org/pdf/2603.08852)
+**Install:** `pip install ldp-protocol` · **Website:** [ldp.sunilprakash.com](https://ldp.sunilprakash.com) · **Paper:** [arXiv:2603.08852](https://arxiv.org/abs/2603.08852) · [PDF](https://arxiv.org/pdf/2603.08852)
 
 ## Why LDP?
 
