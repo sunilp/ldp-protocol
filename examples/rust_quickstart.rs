@@ -1,7 +1,7 @@
-//! LDP Quick Start — register LDP in a JamJet runtime and invoke a delegate.
+//! LDP Quick Start — create an LDP adapter and invoke a delegate.
 //!
 //! This example shows how to:
-//! 1. Register LDP as a protocol adapter alongside MCP and A2A
+//! 1. Create an LDP adapter (standalone or with a registry)
 //! 2. Discover a remote delegate's identity and capabilities
 //! 3. Invoke a task via the LDP session lifecycle
 //! 4. Inspect provenance in the result
@@ -12,6 +12,7 @@
 //! Requires a running LDP delegate at localhost:8090 (see examples/python_sdk/ldp_delegate.py)
 
 use ldp_protocol::{register_ldp, LdpAdapterConfig, SessionConfig, PayloadMode};
+use ldp_protocol::protocol::ProtocolRegistry;
 
 #[tokio::main]
 async fn main() {
@@ -34,19 +35,26 @@ async fn main() {
     println!("  trust enforcement: {}", config.enforce_trust_domains);
     println!("  attach provenance: {}", config.attach_provenance);
 
-    // 2. In a real JamJet setup, register with the protocol registry:
-    //
-    //    let mut registry = default_protocol_registry(); // MCP, A2A built-in
-    //    register_ldp(&mut registry, Some(config));      // LDP plugged in
-    //
-    //    // Now ldp:// URLs are handled by LDP, a2a:// by A2A, mcp:// by MCP
-    //    let caps = registry.discover("ldp://localhost:8090").await?;
-    //    let handle = registry.invoke("ldp://localhost:8090", task).await?;
+    // 2. Register with a protocol registry
+    let mut registry = ProtocolRegistry::new();
+    register_ldp(&mut registry, Some(config));
 
-    println!("\nLDP adapter ready. In production, register with:");
-    println!("  register_ldp(&mut registry, Some(config));");
-    println!("\nThen use ldp:// URLs in workflow nodes:");
-    println!("  registry.discover(\"ldp://localhost:8090\")");
-    println!("  registry.invoke(\"ldp://localhost:8090\", task)");
+    // Now ldp:// URLs are handled by the LDP adapter
+    println!("\nRegistered protocols: {:?}", registry.protocols());
+    println!("  ldp:// adapter: {}", registry.adapter_for_url("ldp://localhost:8090").is_some());
+
+    // 3. In production, use the registry to discover and invoke:
+    //
+    //    let caps = registry.adapter_for_url("ldp://localhost:8090")
+    //        .unwrap()
+    //        .discover("http://localhost:8090").await?;
+    //
+    //    let handle = registry.adapter_for_url("ldp://localhost:8090")
+    //        .unwrap()
+    //        .invoke("http://localhost:8090", task).await?;
+
+    println!("\nUse the adapter via the registry:");
+    println!("  registry.adapter_for_url(\"ldp://...\").unwrap().discover(url).await");
+    println!("  registry.adapter_for_url(\"ldp://...\").unwrap().invoke(url, task).await");
     println!("\n=== Done ===");
 }

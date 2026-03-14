@@ -3,11 +3,11 @@
 //! Spins up an in-process HTTP server backed by LdpServer,
 //! then exercises the LdpAdapter (ProtocolAdapter) against it.
 
-use jamjet_ldp::config::LdpAdapterConfig;
-use jamjet_ldp::server::LdpServer;
-use jamjet_ldp::types::messages::LdpEnvelope;
-use jamjet_ldp::LdpAdapter;
-use jamjet_protocols::{ProtocolAdapter, TaskRequest};
+use ldp_protocol::config::LdpAdapterConfig;
+use ldp_protocol::protocol::{ProtocolAdapter, TaskRequest, TaskStatus};
+use ldp_protocol::server::LdpServer;
+use ldp_protocol::types::messages::LdpEnvelope;
+use ldp_protocol::LdpAdapter;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -123,9 +123,6 @@ async fn test_invoke_returns_handle() {
     let task = TaskRequest {
         skill: "echo".into(),
         input: json!({"message": "hello"}),
-        timeout_secs: Some(5),
-        stream: false,
-        metadata: json!({}),
     };
 
     let handle = adapter.invoke(&base_url, task).await.unwrap();
@@ -142,9 +139,6 @@ async fn test_invoke_and_status() {
     let task = TaskRequest {
         skill: "echo".into(),
         input: json!({"value": 42}),
-        timeout_secs: Some(5),
-        stream: false,
-        metadata: json!({}),
     };
 
     let handle = adapter.invoke(&base_url, task).await.unwrap();
@@ -153,7 +147,7 @@ async fn test_invoke_and_status() {
     let status = adapter.status(&base_url, &handle.task_id).await.unwrap();
 
     match status {
-        jamjet_protocols::TaskStatus::Completed { output } => {
+        TaskStatus::Completed { output } => {
             // Should contain the echo output.
             assert!(output.get("echo").is_some() || output.get("result").is_some());
             // Should contain provenance.
@@ -178,9 +172,6 @@ async fn test_session_reuse() {
     let task1 = TaskRequest {
         skill: "echo".into(),
         input: json!({"call": 1}),
-        timeout_secs: Some(5),
-        stream: false,
-        metadata: json!({}),
     };
     let h1 = adapter.invoke(&base_url, task1).await.unwrap();
 
@@ -188,9 +179,6 @@ async fn test_session_reuse() {
     let task2 = TaskRequest {
         skill: "echo".into(),
         input: json!({"call": 2}),
-        timeout_secs: Some(5),
-        stream: false,
-        metadata: json!({}),
     };
     let h2 = adapter.invoke(&base_url, task2).await.unwrap();
 
@@ -210,9 +198,6 @@ async fn test_cancel() {
     let task = TaskRequest {
         skill: "echo".into(),
         input: json!({}),
-        timeout_secs: Some(5),
-        stream: false,
-        metadata: json!({}),
     };
 
     let handle = adapter.invoke(&base_url, task).await.unwrap();
@@ -231,15 +216,12 @@ async fn test_provenance_present_in_output() {
     let task = TaskRequest {
         skill: "echo".into(),
         input: json!({"data": "test"}),
-        timeout_secs: Some(5),
-        stream: false,
-        metadata: json!({}),
     };
 
     let handle = adapter.invoke(&base_url, task).await.unwrap();
     let status = adapter.status(&base_url, &handle.task_id).await.unwrap();
 
-    if let jamjet_protocols::TaskStatus::Completed { output } = status {
+    if let TaskStatus::Completed { output } = status {
         let prov = output.get("ldp_provenance").expect("provenance missing");
         assert_eq!(
             prov.get("produced_by").unwrap().as_str().unwrap(),
@@ -263,7 +245,7 @@ async fn test_trust_domain_mismatch_rejected() {
     // Adapter requires a different trust domain.
     let adapter = LdpAdapter::new(LdpAdapterConfig {
         delegate_id: "ldp:delegate:strict-client".into(),
-        session: jamjet_ldp::types::session::SessionConfig {
+        session: ldp_protocol::types::session::SessionConfig {
             required_trust_domain: Some("production-only".into()),
             ..Default::default()
         },

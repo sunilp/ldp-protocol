@@ -1,68 +1,66 @@
-//! JamJet plugin registration for LDP.
+//! LDP plugin registration.
 //!
-//! This module provides the glue code to register the LDP adapter with
-//! JamJet's `ProtocolRegistry` — **without modifying any JamJet source code**.
+//! Provides registration for the LDP adapter with a `ProtocolRegistry`.
 //!
-//! # Plugin Architecture
-//!
-//! JamJet's `ProtocolRegistry` is designed for runtime extension:
-//!
-//! ```text
-//! ┌─────────────────────────────────────┐
-//! │  JamJet Runtime (unmodified)        │
-//! │                                     │
-//! │  ProtocolRegistry                   │
-//! │  ├── "mcp"  → McpAdapter  (built-in)│
-//! │  ├── "a2a"  → A2aAdapter  (built-in)│
-//! │  ├── "anp"  → AnpAdapter  (built-in)│
-//! │  └── "ldp"  → LdpAdapter  (plugin!) │  ← registered at startup
-//! │                                     │
-//! └─────────────────────────────────────┘
-//! ```
-//!
-//! No new `NodeKind` variant needed. LDP tasks are dispatched via
-//! URL-based routing: any URL with `ldp://` prefix is automatically
-//! routed to the LDP adapter by `ProtocolRegistry::adapter_for_url()`.
-//!
-//! # Usage
+//! # Standalone Usage
 //!
 //! ```rust,ignore
-//! use jamjet_ldp::plugin::register_ldp;
+//! use ldp_protocol::plugin::register_ldp;
+//! use ldp_protocol::protocol::ProtocolRegistry;
+//!
+//! let mut registry = ProtocolRegistry::new();
+//! register_ldp(&mut registry, None);
+//! ```
+//!
+//! # JamJet Usage (with `jamjet` feature)
+//!
+//! ```rust,ignore
+//! use ldp_protocol::plugin::register_ldp_jamjet;
 //! use jamjet_protocols::ProtocolRegistry;
 //!
 //! let mut registry = ProtocolRegistry::new();
-//! // ... register built-in adapters ...
-//! register_ldp(&mut registry, None); // default config
+//! register_ldp_jamjet(&mut registry, None);
 //! ```
 
 use crate::config::LdpAdapterConfig;
+use crate::protocol::ProtocolRegistry;
 use crate::LdpAdapter;
-use jamjet_protocols::ProtocolRegistry;
 use std::sync::Arc;
 
-/// Register the LDP adapter with a JamJet `ProtocolRegistry`.
-///
-/// This is the single integration point. Call this at startup alongside
-/// the built-in adapter registrations. No JamJet source changes required.
+/// Register the LDP adapter with a `ProtocolRegistry`.
 ///
 /// # Arguments
 ///
-/// * `registry` — The JamJet protocol registry to register with.
+/// * `registry` — The protocol registry to register with.
 /// * `config` — Optional LDP configuration. Uses defaults if `None`.
 ///
 /// # URL Routing
 ///
-/// Registers `"ldp://"` as the URL prefix. Any remote agent URL starting
-/// with `ldp://` will be automatically routed to this adapter.
+/// Registers `"ldp://"` as the URL prefix. Any URL starting with `ldp://`
+/// will be routed to the LDP adapter.
 pub fn register_ldp(registry: &mut ProtocolRegistry, config: Option<LdpAdapterConfig>) {
     let config = config.unwrap_or_default();
     let adapter = Arc::new(LdpAdapter::new(config));
     registry.register("ldp", adapter, vec!["ldp://"]);
 }
 
-/// Create a standalone LDP adapter (for use outside JamJet's registry).
+/// Register the LDP adapter with JamJet's `ProtocolRegistry`.
 ///
-/// Useful for experiments and benchmarks that bypass the workflow engine.
+/// This bridges LDP into JamJet's runtime without modifying JamJet source code.
+/// Only available when the `jamjet` feature is enabled.
+#[cfg(feature = "jamjet")]
+pub fn register_ldp_jamjet(
+    registry: &mut jamjet_protocols::ProtocolRegistry,
+    config: Option<LdpAdapterConfig>,
+) {
+    let config = config.unwrap_or_default();
+    let adapter = Arc::new(LdpAdapter::new(config));
+    registry.register("ldp", adapter, vec!["ldp://"]);
+}
+
+/// Create a standalone LDP adapter instance.
+///
+/// Useful for direct usage without a registry.
 pub fn create_adapter(config: Option<LdpAdapterConfig>) -> Arc<LdpAdapter> {
     Arc::new(LdpAdapter::new(config.unwrap_or_default()))
 }
@@ -87,5 +85,11 @@ mod tests {
 
         assert!(registry.adapter_for_url("ldp://delegate.example.com").is_some());
         assert!(registry.adapter_for_url("https://not-ldp.com").is_none());
+    }
+
+    #[tokio::test]
+    async fn create_standalone_adapter() {
+        let adapter = create_adapter(None);
+        assert_eq!(adapter.session_manager().active_count().await, 0);
     }
 }

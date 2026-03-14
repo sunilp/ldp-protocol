@@ -7,12 +7,14 @@ license = "Apache-2.0"
 repository = "https://github.com/sunilp/ldp-protocol"
 keywords = ["llm", "agents", "protocol", "delegation", "multi-agent"]
 categories = ["network-programming", "web-programming"]
-publish = false
+
+[features]
+default = []
+jamjet = ["dep:jamjet-protocols"]
 
 [dependencies]
-# JamJet dependencies (path references — adjust if needed)
-jamjet-protocols = { path = "../jamjet/runtime/protocols" }
-jamjet-agents = { path = "../jamjet/runtime/agents" }
+# JamJet integration (optional — enable with `features = ["jamjet"]`)
+jamjet-protocols = { path = "../jamjet/runtime/protocols", optional = true }
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }

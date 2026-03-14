@@ -1,39 +1,43 @@
-//! JamJet LDP Protocol Adapter
+//! LDP — LLM Delegate Protocol
 //!
-//! Implements the LLM Delegate Protocol (LDP) as a JamJet protocol adapter,
-//! alongside existing MCP and A2A adapters.
+//! An identity-aware communication protocol for multi-agent LLM systems.
+//! LDP adds delegation intelligence on top of agent communication protocols
+//! like A2A and MCP: rich identity, progressive payload modes, governed
+//! sessions, structured provenance, and trust domains.
 //!
 //! # Architecture
 //!
-//! The adapter follows JamJet's `ProtocolAdapter` trait pattern:
-//!
 //! ```text
-//! JamJet Workflow Engine
-//!   ↓ discover / invoke / stream / status / cancel
-//! LdpAdapter (ProtocolAdapter impl)
-//!   ↓ manages sessions transparently
-//! SessionManager
-//!   ↓ HELLO → SESSION_PROPOSE → SESSION_ACCEPT → TASK_SUBMIT
-//! LdpClient (HTTP)
-//!   ↓
-//! Remote LDP Delegate
+//! ┌──────────────────────────────────────────┐
+//! │  Delegation Intelligence — LDP           │
+//! │  (identity, routing, provenance, trust)  │
+//! ├──────────────────────────────────────────┤
+//! │  Agent Communication — A2A               │
+//! ├──────────────────────────────────────────┤
+//! │  Tool Integration — MCP                  │
+//! └──────────────────────────────────────────┘
 //! ```
 //!
-//! # Key Design Decisions
+//! # Quick Start
 //!
-//! - **Sessions are transparent**: JamJet's workflow engine sees request→response.
-//!   The adapter handles session lifecycle internally.
-//! - **AgentCard extension**: LDP identity fields go in `AgentCard.labels` with
-//!   `ldp.*` keys. A full `LdpIdentityCard` is maintained internally.
-//! - **Provenance embedded in output**: Every completed task carries provenance
-//!   metadata in the output `Value`, flowing through JamJet's existing pipeline.
-//! - **Trust domain enforcement**: Validated during `discover()` before any
-//!   session is established.
+//! ```rust,ignore
+//! use ldp_protocol::{LdpAdapter, LdpAdapterConfig};
+//! use ldp_protocol::protocol::{ProtocolAdapter, TaskRequest};
+//!
+//! let adapter = LdpAdapter::new(LdpAdapterConfig::default());
+//! let caps = adapter.discover("http://delegate.example.com").await?;
+//! ```
+//!
+//! # Feature Flags
+//!
+//! - **`jamjet`** — Enable JamJet runtime integration. Adds `register_ldp_jamjet()`
+//!   for plugging LDP into JamJet's `ProtocolRegistry`.
 
 pub mod adapter;
 pub mod client;
 pub mod config;
 pub mod plugin;
+pub mod protocol;
 pub mod server;
 pub mod session_manager;
 pub mod types;
@@ -41,7 +45,8 @@ pub mod types;
 pub use adapter::LdpAdapter;
 pub use client::LdpClient;
 pub use config::LdpAdapterConfig;
-pub use plugin::register_ldp;
+pub use plugin::{create_adapter, register_ldp};
+pub use protocol::{ProtocolAdapter, ProtocolRegistry, RemoteCapabilities, TaskRequest};
 pub use server::LdpServer;
 pub use session_manager::SessionManager;
 pub use types::*;

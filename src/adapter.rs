@@ -1,28 +1,29 @@
-//! LDP protocol adapter — implements JamJet's `ProtocolAdapter` trait.
+//! LDP protocol adapter — implements the `ProtocolAdapter` trait.
 //!
-//! This is the primary integration point with JamJet. The adapter:
-//! - Translates JamJet's `discover/invoke/stream/status/cancel` into LDP messages
-//! - Manages sessions transparently (JamJet sees request→response)
+//! This is the primary integration point. The adapter:
+//! - Translates `discover/invoke/stream/status/cancel` into LDP messages
+//! - Manages sessions transparently (callers see request->response)
 //! - Attaches provenance to all results
 //! - Enforces trust domain boundaries
 
 use crate::client::LdpClient;
 use crate::config::LdpAdapterConfig;
+use crate::protocol::{
+    ProtocolAdapter, RemoteCapabilities, RemoteSkill, TaskEvent, TaskHandle, TaskRequest,
+    TaskStatus, TaskStream,
+};
 use crate::session_manager::SessionManager;
 use crate::types::messages::{LdpEnvelope, LdpMessageBody};
 use crate::types::provenance::Provenance;
 
 use async_trait::async_trait;
-use jamjet_protocols::{
-    ProtocolAdapter, RemoteCapabilities, RemoteSkill, TaskEvent, TaskHandle, TaskRequest,
-    TaskStatus, TaskStream,
-};
 use serde_json::{json, Value};
 use tracing::{debug, info, instrument};
 
-/// LDP protocol adapter for JamJet.
+/// LDP protocol adapter.
 ///
-/// Registered as `"ldp"` in `ProtocolRegistry` with `"ldp://"` URL prefix.
+/// Can be used standalone or registered with a `ProtocolRegistry`
+/// (including JamJet's registry via the `jamjet` feature).
 pub struct LdpAdapter {
     session_manager: SessionManager,
     client: LdpClient,
@@ -56,7 +57,7 @@ impl LdpAdapter {
         &self.session_manager
     }
 
-    /// Convert an LDP identity card to JamJet RemoteCapabilities.
+    /// Convert an LDP identity card to RemoteCapabilities.
     fn identity_to_capabilities(
         &self,
         identity: &crate::types::identity::LdpIdentityCard,
@@ -107,7 +108,7 @@ impl ProtocolAdapter for LdpAdapter {
     ///
     /// 1. Fetch LDP identity card
     /// 2. Validate trust domain (if configured)
-    /// 3. Map to JamJet RemoteCapabilities
+    /// 3. Map to RemoteCapabilities
     #[instrument(skip(self), fields(url = %url))]
     async fn discover(&self, url: &str) -> Result<RemoteCapabilities, String> {
         info!(url = %url, "Discovering LDP delegate");
@@ -127,7 +128,7 @@ impl ProtocolAdapter for LdpAdapter {
             }
         }
 
-        // Convert to JamJet RemoteCapabilities.
+        // Convert to RemoteCapabilities.
         let capabilities = self.identity_to_capabilities(&identity);
         debug!(
             name = %capabilities.name,
@@ -142,8 +143,7 @@ impl ProtocolAdapter for LdpAdapter {
     ///
     /// 1. Get or establish session (transparent to caller)
     /// 2. Send TASK_SUBMIT within session
-    /// 3. Poll or wait for TASK_RESULT
-    /// 4. Return TaskHandle
+    /// 3. Return TaskHandle
     #[instrument(skip(self, task), fields(url = %url, skill = %task.skill))]
     async fn invoke(&self, url: &str, task: TaskRequest) -> Result<TaskHandle, String> {
         info!(url = %url, skill = %task.skill, "Invoking LDP task");
