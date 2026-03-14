@@ -253,15 +253,67 @@ See [`sdk/python/`](sdk/python/) for full documentation.
 
 ### Rust (reference implementation)
 
-```bash
-cargo add ldp-protocol  # coming soon to crates.io
-```
-
-The Rust crate serves as the reference implementation and provides native integration with the [JamJet](https://github.com/jamjet-labs/jamjet) agent runtime via an optional `jamjet` feature flag.
+The Rust crate serves as the reference implementation — useful for production deployments and native integration with the [JamJet](https://github.com/jamjet-labs/jamjet) agent runtime.
 
 ```bash
 cargo build
-cargo test   # 17 tests
+cargo test   # 17 tests (10 unit + 7 integration)
+```
+
+#### Standalone adapter
+
+```rust
+use ldp_protocol::{LdpAdapter, LdpAdapterConfig};
+use ldp_protocol::protocol::{ProtocolAdapter, TaskRequest};
+use serde_json::json;
+
+let adapter = LdpAdapter::new(LdpAdapterConfig {
+    delegate_id: "ldp:delegate:my-orchestrator".into(),
+    ..Default::default()
+});
+
+// Discover a remote delegate
+let caps = adapter.discover("http://localhost:8090").await?;
+println!("Found: {} with {} skills", caps.name, caps.skills.len());
+
+// Submit a task
+let handle = adapter.invoke("http://localhost:8090", TaskRequest {
+    skill: "reasoning".into(),
+    input: json!({"prompt": "Analyze the tradeoffs..."}),
+}).await?;
+```
+
+#### With a protocol registry
+
+```rust
+use ldp_protocol::{register_ldp, LdpAdapterConfig};
+use ldp_protocol::protocol::ProtocolRegistry;
+
+let mut registry = ProtocolRegistry::new();
+register_ldp(&mut registry, Some(LdpAdapterConfig::default()));
+
+// ldp:// URLs are now routed to the LDP adapter
+let adapter = registry.adapter_for_url("ldp://delegate.example.com").unwrap();
+let caps = adapter.discover("http://delegate.example.com").await?;
+```
+
+#### JamJet integration
+
+Enable the `jamjet` feature to plug LDP into JamJet's runtime alongside MCP and A2A:
+
+```toml
+[dependencies]
+ldp-protocol = { version = "0.1", features = ["jamjet"] }
+```
+
+```rust
+use ldp_protocol::plugin::register_ldp_jamjet;
+
+let mut registry = jamjet_protocols::ProtocolRegistry::new();
+// MCP, A2A registered by JamJet...
+register_ldp_jamjet(&mut registry, None);  // LDP plugged in
+
+// Now ldp:// URLs route through LDP with full session management
 ```
 
 ## Project Structure
