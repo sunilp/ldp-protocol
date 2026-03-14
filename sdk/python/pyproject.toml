@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ldp-protocol"
+version = "0.1.0"
+description = "LDP — LLM Delegate Protocol: identity-aware communication for multi-agent LLM systems"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [
+    { name = "Sunil Prakash" },
+]
+keywords = ["llm", "agents", "protocol", "delegation", "multi-agent", "a2a", "mcp"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+    "Typing :: Typed",
+]
+dependencies = [
+    "pydantic>=2.0",
+    "httpx>=0.25",
+]
+
+[project.optional-dependencies]
+server = ["starlette>=0.27", "uvicorn>=0.23"]
+dev = ["pytest>=7.0", "pytest-asyncio>=0.21", "ruff>=0.1"]
+
+[project.urls]
+Homepage = "https://github.com/sunilp/ldp-protocol"
+Documentation = "https://github.com/sunilp/ldp-protocol/tree/main/sdk/python"
+Repository = "https://github.com/sunilp/ldp-protocol"
+Issues = "https://github.com/sunilp/ldp-protocol/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ldp_protocol"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

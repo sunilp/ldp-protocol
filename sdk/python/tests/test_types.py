@@ -1,0 +1,172 @@
+"""Tests for LDP protocol types."""
+
+from ldp_protocol.types import (
+    LdpCapability,
+    LdpEnvelope,
+    LdpIdentityCard,
+    LdpMessageBody,
+    NegotiatedPayload,
+    PayloadMode,
+    Provenance,
+    QualityMetrics,
+    SessionConfig,
+    TrustDomain,
+    negotiate_payload_mode,
+)
+
+
+class TestPayloadMode:
+    def test_mode_numbers(self):
+        assert PayloadMode.TEXT.mode_number == 0
+        assert PayloadMode.SEMANTIC_FRAME.mode_number == 1
+        assert PayloadMode.EMBEDDING_HINTS.mode_number == 2
+        assert PayloadMode.SEMANTIC_GRAPH.mode_number == 3
+
+    def test_is_implemented(self):
+        assert PayloadMode.TEXT.is_implemented
+        assert PayloadMode.SEMANTIC_FRAME.is_implemented
+        assert not PayloadMode.EMBEDDING_HINTS.is_implemented
+        assert not PayloadMode.SEMANTIC_GRAPH.is_implemented
+
+
+class TestPayloadNegotiation:
+    def test_both_support_semantic_frame(self):
+        result = negotiate_payload_mode(
+            [PayloadMode.SEMANTIC_FRAME, PayloadMode.TEXT],
+            [PayloadMode.SEMANTIC_FRAME, PayloadMode.TEXT],
+        )
+        assert result.mode == PayloadMode.SEMANTIC_FRAME
+        assert result.fallback_chain == [PayloadMode.TEXT]
+
+    def test_falls_back_to_text(self):
+        result = negotiate_payload_mode(
+            [PayloadMode.SEMANTIC_FRAME, PayloadMode.TEXT],
+            [PayloadMode.TEXT],
+        )
+        assert result.mode == PayloadMode.TEXT
+        assert result.fallback_chain == []
+
+    def test_empty_prefs_default_to_text(self):
+        result = negotiate_payload_mode([], [])
+        assert result.mode == PayloadMode.TEXT
+
+    def test_skips_unimplemented_modes(self):
+        result = negotiate_payload_mode(
+            [PayloadMode.SEMANTIC_GRAPH, PayloadMode.SEMANTIC_FRAME, PayloadMode.TEXT],
+            [PayloadMode.SEMANTIC_GRAPH, PayloadMode.TEXT],
+        )
+        assert result.mode == PayloadMode.TEXT
+
+
+class TestTrustDomain:
+    def test_same_domain_trusted(self):
+        domain = TrustDomain(name="acme-prod")
+        assert domain.trusts("acme-prod")
+
+    def test_cross_domain_denied_by_default(self):
+        domain = TrustDomain(name="acme-prod")
+        assert not domain.trusts("external")
+
+    def test_cross_domain_with_explicit_peer(self):
+        domain = TrustDomain(
+            name="acme-prod",
+            allow_cross_domain=True,
+            trusted_peers=["partner-corp"],
+        )
+        assert domain.trusts("partner-corp")
+        assert not domain.trusts("unknown-corp")
+
+
+class TestIdentityCard:
+    def _make_card(self) -> LdpIdentityCard:
+        return LdpIdentityCard(
+            delegate_id="ldp:delegate:test",
+            name="Test Agent",
+            model_family="claude",
+            model_version="claude-sonnet-4-6",
+            trust_domain=TrustDomain(name="test"),
+            context_window=128000,
+            capabilities=[
+                LdpCapability(
+                    name="reasoning",
+                    quality=QualityMetrics(
+                        quality_score=0.85,
+                        cost_per_call_usd=0.01,
+                        latency_p50_ms=1200,
+                    ),
+                ),
+                LdpCapability(name="summarization"),
+            ],
+        )
+
+    def test_capability_lookup(self):
+        card = self._make_card()
+        assert card.capability("reasoning") is not None
+        assert card.capability("nonexistent") is None
+
+    def test_quality_score(self):
+        card = self._make_card()
+        assert card.quality_score("reasoning") == 0.85
+        assert card.quality_score("summarization") == 0.0
+        assert card.quality_score("nonexistent") == 0.0
+
+    def test_cost(self):
+        card = self._make_card()
+        assert card.cost("reasoning") == 0.01
+        assert card.cost("summarization") == float("inf")
+
+    def test_latency(self):
+        card = self._make_card()
+        assert card.latency("reasoning") == 1200
+
+    def test_serialization_roundtrip(self):
+        card = self._make_card()
+        data = card.model_dump()
+        restored = LdpIdentityCard.model_validate(data)
+        assert restored.delegate_id == card.delegate_id
+        assert restored.quality_score("reasoning") == 0.85
+
+
+class TestProvenance:
+    def test_create(self):
+        p = Provenance.create("ldp:delegate:test", "v1.0", confidence=0.9)
+        assert p.produced_by == "ldp:delegate:test"
+        assert p.model_version == "v1.0"
+        assert p.confidence == 0.9
+        assert p.verified is False
+        assert p.timestamp is not None
+
+
+class TestMessages:
+    def test_hello(self):
+        body = LdpMessageBody.hello("ldp:delegate:test", [PayloadMode.TEXT])
+        assert body.type == "HELLO"
+        assert body.delegate_id == "ldp:delegate:test"
+
+    def test_task_submit(self):
+        body = LdpMessageBody.task_submit("task-1", "reasoning", {"prompt": "test"})
+        assert body.type == "TASK_SUBMIT"
+        assert body.task_id == "task-1"
+        assert body.skill == "reasoning"
+
+    def test_task_result(self):
+        prov = Provenance.create("ldp:delegate:test", "v1.0")
+        body = LdpMessageBody.task_result("task-1", {"answer": "42"}, prov)
+        assert body.type == "TASK_RESULT"
+        assert body.output == {"answer": "42"}
+        assert body.provenance is not None
+
+    def test_envelope_create(self):
+        body = LdpMessageBody.hello("test", [PayloadMode.TEXT])
+        env = LdpEnvelope.create("sess-1", "from-id", "to-id", body)
+        assert env.session_id == "sess-1"
+        assert env.body.type == "HELLO"
+        assert env.message_id  # auto-generated
+
+    def test_envelope_serialization(self):
+        body = LdpMessageBody.task_submit("t1", "echo", {"data": 1})
+        env = LdpEnvelope.create("s1", "a", "b", body)
+        data = env.model_dump(by_alias=True)
+        assert "from" in data  # alias works
+        restored = LdpEnvelope.model_validate(data)
+        assert restored.body.task_id == "t1"
