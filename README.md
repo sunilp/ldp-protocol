@@ -8,18 +8,26 @@ LDP extends service-oriented agent protocols (like [A2A](https://github.com/a2ap
 
 ## Why LDP?
 
-Current agent protocols treat AI agents as opaque services — exposing only a name, description, and skill list. This discards information critical to effective delegation:
+[A2A](https://github.com/a2aproject/A2A) handles agent-to-agent communication. [MCP](https://modelcontextprotocol.io/) handles agent-to-tool integration. LDP adds the **delegation intelligence layer** on top — the layer that decides *which* agent to route to, *how* to encode the payload, and *whether to trust* the result.
 
-| What a router needs to know | A2A | MCP | LDP |
-|---|:---:|:---:|:---:|
-| Model family and version | - | - | Yes |
-| Quality hints (0-1 score) | - | - | Yes |
-| Reasoning profile | - | - | Yes |
-| Cost/latency characteristics | - | - | Yes |
-| Payload format negotiation | - | - | Yes |
-| Multi-round sessions | - | - | Yes |
-| Structured provenance | - | - | Yes |
-| Trust domain enforcement | - | - | Yes |
+```
+┌──────────────────────────────────────────┐
+│  Delegation Intelligence — LDP           │
+│  (identity, routing, provenance, trust)  │
+├──────────────────────────────────────────┤
+│  Agent Communication — A2A               │
+├──────────────────────────────────────────┤
+│  Tool Integration — MCP                  │
+└──────────────────────────────────────────┘
+```
+
+LDP extends agent protocols with AI-native primitives:
+
+- **Rich delegate identity** — model family, quality scores, reasoning profiles, cost/latency hints
+- **Progressive payload modes** — negotiate encoding efficiency (37% token reduction with semantic frames)
+- **Governed sessions** — persistent context eliminates re-transmitting conversation history
+- **Structured provenance** — every response carries who produced it, confidence, and verification status
+- **Trust domains** — protocol-level security boundaries beyond transport-level auth
 
 ## Quick Start
 
