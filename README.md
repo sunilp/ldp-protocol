@@ -4,7 +4,7 @@ An identity-aware communication protocol for multi-agent LLM systems.
 
 LDP extends service-oriented agent protocols (like [A2A](https://github.com/a2aproject/A2A) and [MCP](https://modelcontextprotocol.io/)) with AI-native primitives: rich delegate identity, progressive payload modes, governed sessions, structured provenance, and trust domains.
 
-**Paper:** [arXiv:2603.08852](https://arxiv.org/abs/2603.08852) · [PDF](https://arxiv.org/pdf/2603.08852)
+**Install:** `pip install ldp-protocol` · **Paper:** [arXiv:2603.08852](https://arxiv.org/abs/2603.08852) · [PDF](https://arxiv.org/pdf/2603.08852)
 
 ## Why LDP?
 
@@ -31,82 +31,113 @@ LDP extends agent protocols with AI-native primitives:
 
 ## Quick Start
 
-### Python — Run an LDP delegate in 30 seconds
+```bash
+pip install ldp-protocol
+```
+
+### See it in action — Smart vs Blind Routing
 
 ```bash
-cd examples/python_sdk
-pip install -r requirements.txt
-
-# Terminal 1: Start a delegate
-python ldp_delegate.py
-
-# Terminal 2: Discover and invoke it
-python ldp_client.py
+python examples/demo_smart_routing.py
 ```
 
-**Output:**
 ```
-1. Discovering delegate...
-   Name: Research Analyst
-   Model: claude claude-sonnet-4-6
-   Trust: research.internal
-   Capabilities: ['reasoning', 'summarization']
+Discovered 3 delegates:
 
-2. Establishing session...
-   Session established: a3f2c1d8... (mode: SemanticFrame)
+  Fast Agent       gemini-2.0-flash       quality=0.60  cost=$0.001  p50=200ms
+  Balanced Agent   claude-sonnet-4-6      quality=0.82  cost=$0.008  p50=1200ms
+  Deep Agent       claude-opus-4-6        quality=0.95  cost=$0.025  p50=3500ms
 
-3. Submitting reasoning task...
-   Output: {"text": "..."}
-   Provenance:
-     produced_by: ldp:delegate:analyst-01
-     model: claude-sonnet-4-6
-     confidence: 0.85
-     verified: false
+  Round 1: Blind Routing (skill-name only)
+
+  Task (easy  )  ->  Deep Agent       cost=$0.025  latency=3496ms  <- overkill
+  Task (medium)  ->  Deep Agent       cost=$0.025  latency=3493ms  <- expensive
+  Task (hard  )  ->  Deep Agent       cost=$0.025  latency=3755ms  <- correct
+
+  Total: $0.075  |  10,744ms  |  Avg quality: 0.95
+
+  Round 2: LDP Routing (identity-aware)
+
+  Task (easy  )  ->  Fast Agent       cost=$0.001  latency=200ms   <- right-sized
+  Task (medium)  ->  Balanced Agent   cost=$0.008  latency=1108ms  <- right-sized
+  Task (hard  )  ->  Deep Agent       cost=$0.025  latency=3582ms  <- right-sized
+
+  Total: $0.034  |  4,890ms  |  Quality matched to task complexity
+
+  Cost savings:    55% ($0.075 -> $0.034)
+  Latency savings: 54% (10,744ms -> 4,890ms)
+
+  Provenance (LDP exclusive):
+    produced_by:  ldp:delegate:deep-01
+    model:        claude-opus-4-6
+    confidence:   0.91
+    verified:     True
+    payload_mode: semantic_frame (37% fewer tokens than text)
 ```
 
-### Rust — Register in JamJet
-
-```rust
-use ldp_protocol::register_ldp;
-
-let mut registry = default_protocol_registry(); // MCP, A2A built-in
-register_ldp(&mut registry, None);              // LDP plugged in
-
-// Now ldp:// URLs route through LDP with full session management
-let caps = registry.discover("ldp://analyst.internal:8090").await?;
-let handle = registry.invoke("ldp://analyst.internal:8090", task).await?;
-```
-
-### Python — Multi-delegate routing
+### Create a delegate
 
 ```python
-from ldp_client import LdpClient
+from ldp_protocol import LdpDelegate, LdpCapability, QualityMetrics
 
-client = LdpClient()
+class MyDelegate(LdpDelegate):
+    async def handle_task(self, skill, input_data, task_id):
+        return {"answer": "42"}, 0.95  # (output, confidence)
 
-# Discover multiple delegates
-delegates = [
-    await client.discover("http://fast-model:8091"),
-    await client.discover("http://deep-model:8092"),
-]
-
-# Route by quality score (impossible with skill-name-only protocols)
-best = max(delegates, key=lambda d:
-    next(c["quality"]["quality_score"]
-         for c in d["capabilities"] if c["name"] == "reasoning"))
-
-result = await client.submit_task(
-    f"http://localhost:{best['endpoint'].split(':')[-1]}",
-    skill="reasoning",
-    input_data={"prompt": "Analyze the tradeoffs..."},
+delegate = MyDelegate(
+    delegate_id="ldp:delegate:my-agent",
+    name="My Agent",
+    model_family="claude",
+    model_version="claude-sonnet-4-6",
+    capabilities=[
+        LdpCapability(
+            name="reasoning",
+            quality=QualityMetrics(quality_score=0.85, cost_per_call_usd=0.01),
+        ),
+    ],
 )
-
-# Every result carries provenance
-print(result["provenance"]["produced_by"])   # ldp:delegate:deep-01
-print(result["provenance"]["verified"])       # True/False
+delegate.run(port=8090)  # requires: pip install ldp-protocol[server]
 ```
 
-See [`examples/python_sdk/multi_delegate_routing.py`](examples/python_sdk/multi_delegate_routing.py) for the full routing example.
+### Discover and invoke
+
+```python
+from ldp_protocol import LdpClient
+
+async with LdpClient() as client:
+    identity = await client.discover("http://localhost:8090")
+    print(f"Found: {identity.name} ({identity.model_family})")
+    print(f"Quality: {identity.quality_score('reasoning')}")
+
+    result = await client.submit_task(
+        "http://localhost:8090",
+        skill="reasoning",
+        input_data={"prompt": "Analyze the tradeoffs..."},
+    )
+    print(result["output"])
+    print(result["provenance"])  # who produced it, confidence, verified
+```
+
+### Multi-delegate routing
+
+```python
+from ldp_protocol import LdpRouter, RoutingStrategy
+
+async with LdpRouter() as router:
+    await router.discover_delegates([
+        "http://fast-model:8091",
+        "http://deep-model:8092",
+    ])
+
+    # Route by quality, cost, latency, or balanced score
+    result = await router.route_and_submit(
+        skill="reasoning",
+        input_data={"prompt": "Complex analysis..."},
+        strategy=RoutingStrategy.QUALITY,
+    )
+    print(f"Routed to: {result['routed_to']['name']}")
+    print(f"Provenance: {result['provenance']}")
+```
 
 ## Protocol Overview
 
@@ -116,28 +147,26 @@ Every LDP delegate publishes a rich identity card at `GET /ldp/identity`:
 
 ```json
 {
-  "delegate_id": "ldp:delegate:qwen3-8b-reasoning",
-  "model_family": "qwen",
-  "model_version": "qwen3-8b-2026.01",
+  "delegate_id": "ldp:delegate:analyst-01",
+  "model_family": "claude",
+  "model_version": "claude-sonnet-4-6",
   "reasoning_profile": "deep-analytical",
   "cost_profile": "medium",
-  "context_window": 32768,
+  "context_window": 200000,
   "trust_domain": {"name": "research.internal", "allow_cross_domain": false},
   "capabilities": [
     {
       "name": "reasoning",
-      "quality": {"quality_score": 0.85, "latency_p50_ms": 5000, "cost_per_call_usd": 0.015}
+      "quality": {"quality_score": 0.85, "latency_p50_ms": 1200, "cost_per_call_usd": 0.008}
     }
   ],
-  "supported_payload_modes": ["SemanticFrame", "Text"]
+  "supported_payload_modes": ["semantic_frame", "text"]
 }
 ```
 
 This enables **metadata-aware routing**: send easy tasks to fast, cheap models and hard tasks to capable, expensive models — decisions impossible with skill-name-only matching.
 
 ### 2. Progressive Payload Modes
-
-LDP defines payload modes of increasing efficiency:
 
 | Mode | Name | Status | Description |
 |------|------|--------|-------------|
@@ -148,16 +177,16 @@ LDP defines payload modes of increasing efficiency:
 | 4 | Latent Capsules | Future | Compressed machine-native semantic packets. |
 | 5 | Cache Slices | Future | Execution-state transfer between compatible models. |
 
-Delegates negotiate the richest mutually supported mode during session establishment. If a mode fails, the protocol automatically falls back: Mode N → Mode N-1 → ... → Mode 0.
+Delegates negotiate the richest mutually supported mode during session establishment. If a mode fails, the protocol automatically falls back: Mode N -> Mode N-1 -> ... -> Mode 0.
 
 ### 3. Governed Sessions
 
 Unlike stateless protocols, LDP sessions maintain persistent context:
 
 ```
-HELLO → CAPABILITY_MANIFEST → SESSION_PROPOSE → SESSION_ACCEPT
-  → TASK_SUBMIT / TASK_UPDATE / TASK_RESULT (within session context)
-  → SESSION_CLOSE
+HELLO -> CAPABILITY_MANIFEST -> SESSION_PROPOSE -> SESSION_ACCEPT
+  -> TASK_SUBMIT / TASK_UPDATE / TASK_RESULT (within session context)
+  -> SESSION_CLOSE
 ```
 
 Sessions eliminate re-transmitting conversation history, reducing token overhead that grows quadratically with conversation length.
@@ -168,9 +197,9 @@ Every task result carries provenance metadata:
 
 ```json
 {
-  "produced_by": "ldp:delegate:qwen3-8b",
-  "model_version": "qwen3-8b-2026.01",
-  "payload_mode_used": "SemanticFrame",
+  "produced_by": "ldp:delegate:analyst-01",
+  "model_version": "claude-sonnet-4-6",
+  "payload_mode_used": "semantic_frame",
   "confidence": 0.84,
   "verified": true
 }
@@ -186,7 +215,7 @@ Security boundaries enforced at the protocol level:
 - **Session level:** Trust domain compatibility checks during establishment
 - **Policy level:** Capability scope, jurisdiction compliance, cost limits
 
-## HTTP API Reference
+## HTTP API
 
 | Endpoint | Method | Description |
 |---|---|---|
@@ -198,85 +227,76 @@ Security boundaries enforced at the protocol level:
 
 | Type | Direction | Purpose |
 |---|---|---|
-| `HELLO` | → | Initiate handshake with supported modes |
-| `CAPABILITY_MANIFEST` | ← | Declare capabilities |
-| `SESSION_PROPOSE` | → | Propose session with config |
-| `SESSION_ACCEPT` | ← | Accept with negotiated mode |
-| `SESSION_REJECT` | ← | Reject with reason |
-| `TASK_SUBMIT` | → | Submit task within session |
-| `TASK_UPDATE` | ← | Progress update |
-| `TASK_RESULT` | ← | Result with provenance |
-| `TASK_FAILED` | ← | Failure with error |
-| `TASK_CANCEL` | → | Cancel in-flight task |
-| `SESSION_CLOSE` | ↔ | Terminate session |
+| `HELLO` | -> | Initiate handshake with supported modes |
+| `CAPABILITY_MANIFEST` | <- | Declare capabilities |
+| `SESSION_PROPOSE` | -> | Propose session with config |
+| `SESSION_ACCEPT` | <- | Accept with negotiated mode |
+| `SESSION_REJECT` | <- | Reject with reason |
+| `TASK_SUBMIT` | -> | Submit task within session |
+| `TASK_UPDATE` | <- | Progress update |
+| `TASK_RESULT` | <- | Result with provenance |
+| `TASK_FAILED` | <- | Failure with error |
+| `TASK_CANCEL` | -> | Cancel in-flight task |
+| `SESSION_CLOSE` | <-> | Terminate session |
 
-## Implementation
+## SDKs
 
-This repository contains the Rust reference implementation of LDP as a plugin adapter for the [JamJet](https://github.com/jamjet-labs/jamjet) agent runtime.
+### Python (primary)
 
-### Architecture
-
-```
-JamJet Workflow Engine
-  ↓ discover / invoke / stream / status / cancel
-LdpAdapter (ProtocolAdapter impl)
-  ↓ manages sessions transparently
-SessionManager
-  ↓ HELLO → SESSION_PROPOSE → SESSION_ACCEPT → TASK_SUBMIT
-LdpClient (HTTP)
-  ↓
-Remote LDP Delegate (LdpServer)
+```bash
+pip install ldp-protocol
 ```
 
-### Project Structure
+The Python SDK includes: pydantic models for all protocol types, async client with session management, delegate base class with optional Starlette server, and multi-strategy router.
+
+See [`sdk/python/`](sdk/python/) for full documentation.
+
+### Rust (reference implementation)
+
+```bash
+cargo add ldp-protocol  # coming soon to crates.io
+```
+
+The Rust crate serves as the reference implementation and provides native integration with the [JamJet](https://github.com/jamjet-labs/jamjet) agent runtime via an optional `jamjet` feature flag.
+
+```bash
+cargo build
+cargo test   # 17 tests
+```
+
+## Project Structure
 
 ```
 ldp-protocol/
-├── src/
-│   ├── lib.rs              # Public API exports
-│   ├── adapter.rs          # ProtocolAdapter implementation
-│   ├── plugin.rs           # JamJet plugin registration
-│   ├── client.rs           # LDP HTTP client
-│   ├── server.rs           # LDP server + test helpers
-│   ├── session_manager.rs  # Session cache and lifecycle
-│   ├── config.rs           # Adapter configuration
-│   └── types/
-│       ├── identity.rs     # LdpIdentityCard
-│       ├── capability.rs   # Capabilities with quality/cost/latency hints
-│       ├── session.rs      # Session state and negotiation
-│       ├── messages.rs     # LDP message envelope and body types
-│       ├── payload.rs      # PayloadMode, negotiation, fallback
-│       ├── provenance.rs   # Provenance tracking
-│       └── trust.rs        # TrustDomain, policy checks
+├── sdk/python/                 # Python SDK (primary)
+│   ├── src/ldp_protocol/       # Package source
+│   │   ├── types/              # Pydantic models (identity, capability, etc.)
+│   │   ├── client.py           # Async HTTP client
+│   │   ├── delegate.py         # Delegate base class
+│   │   └── router.py           # Multi-strategy routing
+│   └── tests/                  # 29 tests
+├── src/                        # Rust reference implementation
+│   ├── protocol.rs             # Standalone protocol abstractions
+│   ├── adapter.rs              # ProtocolAdapter implementation
+│   ├── client.rs               # LDP HTTP client
+│   ├── server.rs               # LDP server
+│   ├── session_manager.rs      # Session lifecycle
+│   └── types/                  # Protocol type definitions
 ├── examples/
-│   ├── python_sdk/         # Python examples (delegate, client, routing)
-│   ├── identity_card.json  # Example identity card
-│   ├── session_flow.json   # Message sequence example
-│   └── rust_quickstart.rs  # Rust integration example
+│   ├── demo_smart_routing.py   # Killer demo: smart vs blind routing
+│   └── python_sdk/             # Additional Python examples
 ├── tests/
-│   └── ldp_integration.rs  # End-to-end integration tests
+│   └── ldp_integration.rs      # Rust integration tests (17 tests)
 └── docs/
-    ├── RFC.md              # Formal protocol specification
-    └── DESIGN.md           # JamJet integration architecture
-```
-
-### Building
-
-```bash
-# Build
-cargo build
-
-# Run tests
-cargo test
-
-# Run Rust example
-cargo run --example rust_quickstart
+    ├── RFC.md                  # Protocol specification
+    └── DESIGN.md               # Architecture documentation
 ```
 
 ## Documentation
 
 - **[Protocol Specification (RFC)](docs/RFC.md)** — Formal protocol specification
-- **[Design Document](docs/DESIGN.md)** — JamJet integration architecture
+- **[Python SDK](sdk/python/)** — Python package documentation
+- **[Design Document](docs/DESIGN.md)** — Architecture and integration docs
 - **[Research Paper](https://arxiv.org/abs/2603.08852)** — arXiv:2603.08852
 - **[Experiment Code](https://github.com/sunilp/ldp-research)** — Reproduce the empirical evaluation
 
