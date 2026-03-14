@@ -22,7 +22,7 @@ from ldp_protocol.types import (
 )
 from ldp_protocol.client import LdpClient
 from ldp_protocol.delegate import LdpDelegate
-from ldp_protocol.router import LdpRouter
+from ldp_protocol.router import LdpRouter, RoutingStrategy
 
 __version__ = "0.1.0"
 
@@ -46,4 +46,5 @@ __all__ = [
     "LdpDelegate",
     # Router
     "LdpRouter",
+    "RoutingStrategy",
 ]
