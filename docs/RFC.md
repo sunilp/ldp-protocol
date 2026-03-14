@@ -225,6 +225,26 @@ During session establishment, the initiator and responder exchange supported mod
 3. Build fallback chain from remaining common modes with lower mode numbers
 ```
 
+The negotiation and fallback flow can be visualized as:
+
+```mermaid
+sequenceDiagram
+    participant I as Initiator
+    participant R as Responder
+
+    I->>R: HELLO<br/>supported_modes=[semantic_graph, semantic_frame, text]
+    R-->>I: CAPABILITY_MANIFEST<br/>supported_modes=[semantic_frame, text]
+    I->>R: SESSION_PROPOSE<br/>preferred_payload_modes=[semantic_graph, semantic_frame, text]
+    Note over I,R: semantic_graph is skipped because it is not implemented by both parties
+    R-->>I: SESSION_ACCEPT<br/>negotiated_mode=semantic_frame<br/>fallback_chain=[text]
+    Note over I,R: Session starts in the richest mutual implemented mode
+    I->>R: TASK_SUBMIT<br/>payload_mode=semantic_frame
+    R-->>I: TASK_FAILED<br/>reason="semantic_frame validation failed"
+    Note over I,R: Automatic downgrade to the next fallback mode
+    I->>R: TASK_SUBMIT<br/>payload_mode=text
+    R-->>I: TASK_RESULT<br/>payload_mode_used=text
+```
+
 ### 4.3 Fallback
 
 If a payload mode fails mid-session (e.g., schema validation error), the protocol falls back through the negotiated fallback chain:
