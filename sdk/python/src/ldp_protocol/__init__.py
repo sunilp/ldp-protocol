@@ -7,9 +7,12 @@ and trust domains.
 """
 
 from ldp_protocol.types import (
+    BudgetPolicy,
     ClaimType,
+    DelegationContract,
     ErrorSeverity,
     FailureCategory,
+    FailurePolicy,
     LdpCapability,
     LdpEnvelope,
     LdpError,
@@ -18,6 +21,7 @@ from ldp_protocol.types import (
     LdpSession,
     NegotiatedPayload,
     PayloadMode,
+    PolicyEnvelope,
     Provenance,
     QualityMetrics,
     SessionConfig,
@@ -29,16 +33,20 @@ from ldp_protocol.delegate import LdpDelegate
 from ldp_protocol.router import LdpRouter, RoutingStrategy
 from ldp_protocol.signing import sign_envelope, verify_envelope, apply_signature
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     # Types
+    "BudgetPolicy",
     "ClaimType",
+    "DelegationContract",
     "ErrorSeverity",
     "FailureCategory",
+    "FailurePolicy",
     "LdpError",
     "LdpIdentityCard",
     "LdpCapability",
+    "PolicyEnvelope",
     "QualityMetrics",
     "TrustDomain",
     "PayloadMode",

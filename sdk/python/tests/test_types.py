@@ -232,6 +232,79 @@ class TestClaimType:
         assert ClaimType.EXTERNALLY_BENCHMARKED
 
 
+from ldp_protocol.types.contract import (
+    DelegationContract, PolicyEnvelope, FailurePolicy, BudgetPolicy,
+)
+
+
+class TestDelegationContract:
+    def test_contract_creation(self):
+        c = DelegationContract(objective="Summarize", success_criteria=["<=300 words"])
+        assert c.contract_id
+        assert c.objective == "Summarize"
+        assert c.deadline is None
+
+    def test_contract_with_budget(self):
+        c = DelegationContract(
+            objective="task", success_criteria=[],
+            policy=PolicyEnvelope(budget=BudgetPolicy(max_tokens=5000, max_cost_usd=0.05)),
+        )
+        assert c.policy.budget.max_tokens == 5000
+
+    def test_default_failure_policy(self):
+        c = DelegationContract(objective="task", success_criteria=[])
+        assert c.policy.failure_policy == FailurePolicy.FAIL_OPEN
+
+    def test_serialization_roundtrip(self):
+        c = DelegationContract(
+            objective="Analyze", success_criteria=["accuracy > 0.9"],
+            policy=PolicyEnvelope(
+                failure_policy=FailurePolicy.FAIL_CLOSED,
+                budget=BudgetPolicy(max_tokens=10000),
+            ),
+            deadline="2026-06-01T00:00:00Z",
+        )
+        data = c.model_dump()
+        restored = DelegationContract.model_validate(data)
+        assert restored.objective == "Analyze"
+        assert restored.policy.failure_policy == FailurePolicy.FAIL_CLOSED
+
+    def test_policy_envelope_defaults(self):
+        p = PolicyEnvelope()
+        assert p.failure_policy == FailurePolicy.FAIL_OPEN
+        assert p.budget is None
+        assert p.safety_constraints == []
+
+    def test_contract_no_budget_no_deadline(self):
+        c = DelegationContract(objective="Draft ideas", success_criteria=["be creative"])
+        assert c.policy.budget is None
+        assert c.deadline is None
+
+
+class TestProvenanceContract:
+    def test_provenance_has_contract_fields(self):
+        p = Provenance.create("d1", "v1")
+        assert p.contract_id is None
+        assert p.contract_satisfied is None
+        assert p.contract_violations == []
+        assert p.tokens_used is None
+        assert p.cost_usd is None
+
+    def test_provenance_with_usage(self):
+        p = Provenance.create("d1", "v1", tokens_used=5000, cost_usd=0.03)
+        assert p.tokens_used == 5000
+        assert p.cost_usd == 0.03
+
+    def test_provenance_backward_compat(self):
+        old_data = {
+            "produced_by": "d1", "model_version": "v1",
+            "payload_mode_used": "text", "verified": False,
+        }
+        p = Provenance.model_validate(old_data)
+        assert p.produced_by == "d1"
+        assert p.contract_violations == []
+
+
 class TestLdpError:
     def test_identity_error(self):
         err = LdpError.identity("IDENTITY_MISMATCH", "Trust domain mismatch")
