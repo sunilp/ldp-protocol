@@ -24,6 +24,11 @@ class Provenance(BaseModel):
     timestamp: str | None = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
+    tokens_used: int | None = None
+    cost_usd: float | None = None
+    contract_id: str | None = None
+    contract_satisfied: bool | None = None
+    contract_violations: list[str] = Field(default_factory=list)
 
     @classmethod
     def create(cls, delegate_id: str, model_version: str, **kwargs) -> Provenance:
