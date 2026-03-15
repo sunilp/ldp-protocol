@@ -27,6 +27,7 @@ from ldp_protocol.types import (
 from ldp_protocol.client import LdpClient
 from ldp_protocol.delegate import LdpDelegate
 from ldp_protocol.router import LdpRouter, RoutingStrategy
+from ldp_protocol.signing import sign_envelope, verify_envelope, apply_signature
 
 __version__ = "0.1.0"
 
@@ -55,4 +56,8 @@ __all__ = [
     # Router
     "LdpRouter",
     "RoutingStrategy",
+    # Signing
+    "sign_envelope",
+    "verify_envelope",
+    "apply_signature",
 ]

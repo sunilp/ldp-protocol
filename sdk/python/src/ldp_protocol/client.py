@@ -38,11 +38,13 @@ class LdpClient:
         timeout: float = 30.0,
         trust_domain: TrustDomain | None = None,
         enforce_trust_domains: bool = True,
+        signing_secret: str | None = None,
     ):
         self.delegate_id = delegate_id
         self.config = config or SessionConfig()
         self.trust_domain = trust_domain or TrustDomain(name="default")
         self.enforce_trust_domains = enforce_trust_domains
+        self.signing_secret = signing_secret
         self._http = httpx.AsyncClient(timeout=timeout)
         self._sessions: dict[str, LdpSession] = {}
 
@@ -105,6 +107,9 @@ class LdpClient:
 
     async def send_message(self, url: str, envelope: LdpEnvelope) -> LdpEnvelope:
         """Send an LDP message and receive a response."""
+        if self.signing_secret:
+            from ldp_protocol.signing import apply_signature
+            apply_signature(envelope, self.signing_secret)
         endpoint = f"{url.rstrip('/')}/ldp/messages"
         resp = await self._http.post(
             endpoint,

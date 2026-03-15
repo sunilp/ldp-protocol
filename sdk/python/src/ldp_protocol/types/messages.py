@@ -121,6 +121,8 @@ class LdpEnvelope(BaseModel):
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
     )
     provenance: Provenance | None = None
+    signature: str | None = None
+    signature_algorithm: str | None = None
 
     model_config = {"populate_by_name": True}
 

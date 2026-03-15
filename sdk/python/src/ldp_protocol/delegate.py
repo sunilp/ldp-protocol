@@ -57,7 +57,9 @@ class LdpDelegate(ABC):
         supported_payload_modes: list[PayloadMode] | None = None,
         description: str | None = None,
         endpoint: str = "",
+        signing_secret: str | None = None,
     ):
+        self.signing_secret = signing_secret
         self.identity = LdpIdentityCard(
             delegate_id=delegate_id,
             name=name,
@@ -92,20 +94,35 @@ class LdpDelegate(ABC):
 
     async def handle_message(self, envelope: LdpEnvelope) -> LdpEnvelope:
         """Route an incoming LDP message to the appropriate handler."""
+        # Verify signature if signing is configured
+        if self.signing_secret:
+            from ldp_protocol.signing import verify_envelope as verify_sig, apply_signature
+            if envelope.signature:
+                if not verify_sig(envelope, self.signing_secret, envelope.signature):
+                    return LdpEnvelope.create(
+                        session_id=envelope.session_id,
+                        from_id=self.identity.delegate_id,
+                        to_id=envelope.from_,
+                        body=LdpMessageBody.task_failed(
+                            task_id=envelope.body.task_id or "",
+                            error="Invalid message signature",
+                        ),
+                    )
+
         body = envelope.body
 
         if body.type == "HELLO":
-            return self._handle_hello(envelope)
+            response = self._handle_hello(envelope)
         elif body.type == "SESSION_PROPOSE":
-            return self._handle_session_propose(envelope)
+            response = self._handle_session_propose(envelope)
         elif body.type == "TASK_SUBMIT":
-            return await self._handle_task_submit(envelope)
+            response = await self._handle_task_submit(envelope)
         elif body.type == "TASK_CANCEL":
-            return self._handle_task_cancel(envelope)
+            response = self._handle_task_cancel(envelope)
         elif body.type == "SESSION_CLOSE":
-            return self._handle_session_close(envelope)
+            response = self._handle_session_close(envelope)
         else:
-            return LdpEnvelope.create(
+            response = LdpEnvelope.create(
                 session_id=envelope.session_id,
                 from_id=self.identity.delegate_id,
                 to_id=envelope.from_,
@@ -114,6 +131,13 @@ class LdpDelegate(ABC):
                     error=f"Unknown message type: {body.type}",
                 ),
             )
+
+        # Sign outgoing response
+        if self.signing_secret:
+            from ldp_protocol.signing import apply_signature
+            apply_signature(response, self.signing_secret)
+
+        return response
 
     def _handle_hello(self, envelope: LdpEnvelope) -> LdpEnvelope:
         caps = [
