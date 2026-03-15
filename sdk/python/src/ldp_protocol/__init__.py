@@ -8,8 +8,11 @@ and trust domains.
 
 from ldp_protocol.types import (
     ClaimType,
+    ErrorSeverity,
+    FailureCategory,
     LdpCapability,
     LdpEnvelope,
+    LdpError,
     LdpIdentityCard,
     LdpMessageBody,
     LdpSession,
@@ -30,6 +33,9 @@ __version__ = "0.1.0"
 __all__ = [
     # Types
     "ClaimType",
+    "ErrorSeverity",
+    "FailureCategory",
+    "LdpError",
     "LdpIdentityCard",
     "LdpCapability",
     "QualityMetrics",

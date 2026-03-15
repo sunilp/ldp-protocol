@@ -14,6 +14,7 @@ from ldp_protocol.types import (
     negotiate_payload_mode,
 )
 from ldp_protocol.types.capability import ClaimType
+from ldp_protocol.types.error import ErrorSeverity, FailureCategory, LdpError
 
 
 class TestPayloadMode:
@@ -229,3 +230,70 @@ class TestClaimType:
         assert ClaimType.ISSUER_ATTESTED
         assert ClaimType.RUNTIME_OBSERVED
         assert ClaimType.EXTERNALLY_BENCHMARKED
+
+
+class TestLdpError:
+    def test_identity_error(self):
+        err = LdpError.identity("IDENTITY_MISMATCH", "Trust domain mismatch")
+        assert err.category == FailureCategory.IDENTITY
+        assert not err.retryable
+
+    def test_runtime_retryable(self):
+        err = LdpError.runtime("TIMEOUT", "Timed out")
+        assert err.retryable
+
+    def test_partial_output(self):
+        err = LdpError.runtime("TIMEOUT", "Timed out")
+        err.partial_output = {"partial": "data"}
+        assert err.partial_output == {"partial": "data"}
+
+    def test_serialization(self):
+        err = LdpError.capability("SKILL_NOT_FOUND", "No such skill")
+        data = err.model_dump()
+        restored = LdpError.model_validate(data)
+        assert restored.code == "SKILL_NOT_FOUND"
+
+    def test_policy_fatal(self):
+        err = LdpError.policy("TRUST_VIOLATION", "Not allowed")
+        assert err.severity == ErrorSeverity.FATAL
+
+    def test_quality_constructor(self):
+        err = LdpError.quality("BELOW_THRESHOLD", "Too low")
+        assert err.category == FailureCategory.QUALITY
+
+    def test_session_constructor(self):
+        err = LdpError.session("SESSION_EXPIRED", "Session timed out")
+        assert err.category == FailureCategory.SESSION
+        assert err.retryable
+
+    def test_transport_constructor(self):
+        err = LdpError.transport("CONNECTION_LOST", "Lost connection")
+        assert err.category == FailureCategory.TRANSPORT
+        assert err.severity == ErrorSeverity.WARNING
+        assert err.retryable
+
+    def test_task_failed_with_string_creates_typed_error(self):
+        body = LdpMessageBody.task_failed("task-1", "something went wrong")
+        assert body.type == "TASK_FAILED"
+        assert isinstance(body.error, LdpError)
+        assert body.error.code == "TASK_FAILED"
+        assert body.error.message == "something went wrong"
+
+    def test_task_failed_with_ldp_error(self):
+        err = LdpError.runtime("TIMEOUT", "Timed out")
+        body = LdpMessageBody.task_failed("task-1", err)
+        assert isinstance(body.error, LdpError)
+        assert body.error.code == "TIMEOUT"
+
+    def test_session_reject_with_string_creates_typed_error(self):
+        body = LdpMessageBody.session_reject("not trusted")
+        assert body.type == "SESSION_REJECT"
+        assert body.reason == "not trusted"
+        assert isinstance(body.error, LdpError)
+        assert body.error.category == FailureCategory.POLICY
+
+    def test_session_reject_with_ldp_error(self):
+        err = LdpError.policy("TRUST_VIOLATION", "Domain not trusted")
+        body = LdpMessageBody.session_reject(err)
+        assert body.reason == "Domain not trusted"
+        assert body.error.code == "TRUST_VIOLATION"

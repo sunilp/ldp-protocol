@@ -7,6 +7,7 @@ from typing import Any
 from uuid import uuid4
 
 from ldp_protocol.types.capability import LdpCapability, QualityMetrics
+from ldp_protocol.types.error import LdpError
 from ldp_protocol.types.identity import LdpIdentityCard
 from ldp_protocol.types.messages import LdpEnvelope, LdpMessageBody
 from ldp_protocol.types.payload import PayloadMode, negotiate_payload_mode
@@ -198,7 +199,10 @@ class LdpDelegate(ABC):
                 session_id=envelope.session_id,
                 from_id=self.identity.delegate_id,
                 to_id=envelope.from_,
-                body=LdpMessageBody.task_failed(task_id=task_id, error=str(e)),
+                body=LdpMessageBody.task_failed(
+                    task_id=task_id,
+                    error=LdpError.runtime("TASK_EXECUTION_ERROR", str(e)),
+                ),
             )
 
     def _handle_task_cancel(self, envelope: LdpEnvelope) -> LdpEnvelope:

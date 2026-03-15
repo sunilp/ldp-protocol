@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
+from ldp_protocol.types.error import LdpError
 from ldp_protocol.types.payload import PayloadMode
 from ldp_protocol.types.provenance import Provenance
 
@@ -48,7 +49,7 @@ class LdpMessageBody(BaseModel):
     provenance: Provenance | None = None
 
     # TASK_FAILED
-    error: str | None = None
+    error: str | LdpError | None = None
 
     # ATTESTATION
     claim: Any | None = None
@@ -71,8 +72,12 @@ class LdpMessageBody(BaseModel):
         return cls(type="SESSION_ACCEPT", session_id=session_id, negotiated_mode=negotiated_mode)
 
     @classmethod
-    def session_reject(cls, reason: str) -> LdpMessageBody:
-        return cls(type="SESSION_REJECT", reason=reason)
+    def session_reject(cls, reason: str | LdpError) -> LdpMessageBody:
+        if isinstance(reason, str):
+            error = LdpError.policy("SESSION_REJECTED", reason)
+            return cls(type="SESSION_REJECT", reason=reason, error=error)
+        else:
+            return cls(type="SESSION_REJECT", reason=reason.message, error=reason)
 
     @classmethod
     def task_submit(cls, task_id: str, skill: str, input: Any) -> LdpMessageBody:
@@ -89,7 +94,9 @@ class LdpMessageBody(BaseModel):
         return cls(type="TASK_RESULT", task_id=task_id, output=output, provenance=provenance)
 
     @classmethod
-    def task_failed(cls, task_id: str, error: str) -> LdpMessageBody:
+    def task_failed(cls, task_id: str, error: str | LdpError) -> LdpMessageBody:
+        if isinstance(error, str):
+            error = LdpError.runtime("TASK_FAILED", error)
         return cls(type="TASK_FAILED", task_id=task_id, error=error)
 
     @classmethod

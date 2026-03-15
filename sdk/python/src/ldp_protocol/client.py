@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import httpx
 
+from ldp_protocol.types.error import LdpError
 from ldp_protocol.types.identity import LdpIdentityCard
 from ldp_protocol.types.messages import LdpEnvelope, LdpMessageBody
 from ldp_protocol.types.payload import PayloadMode, negotiate_payload_mode
@@ -149,6 +150,11 @@ class LdpClient:
         propose_resp = await self.send_message(url, propose)
 
         if propose_resp.body.type == "SESSION_REJECT":
+            error = propose_resp.body.error
+            if isinstance(error, LdpError):
+                raise ConnectionError(
+                    f"Session rejected [{error.code}]: {error.message}"
+                )
             raise ConnectionError(
                 f"Session rejected: {propose_resp.body.reason}"
             )
@@ -227,7 +233,13 @@ class LdpClient:
                 ),
             }
         elif response.body.type == "TASK_FAILED":
-            raise RuntimeError(f"Task failed: {response.body.error}")
+            error = response.body.error
+            if isinstance(error, LdpError):
+                raise RuntimeError(f"Task failed [{error.code}]: {error.message}")
+            elif isinstance(error, str):
+                raise RuntimeError(f"Task failed: {error}")
+            else:
+                raise RuntimeError("Task failed: unknown error")
         else:
             return {
                 "task_id": task_id,
