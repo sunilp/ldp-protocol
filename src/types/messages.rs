@@ -35,6 +35,14 @@ pub struct LdpEnvelope {
 
     /// Optional provenance (attached to results).
     pub provenance: Option<Provenance>,
+
+    /// HMAC signature of the message (hex-encoded).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature: Option<String>,
+
+    /// Signature algorithm (e.g., "hmac-sha256").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub signature_algorithm: Option<String>,
 }
 
 /// LDP message body variants.
@@ -121,6 +129,8 @@ impl LdpEnvelope {
             payload_mode,
             timestamp: chrono::Utc::now().to_rfc3339(),
             provenance: None,
+            signature: None,
+            signature_algorithm: None,
         }
     }
 }

@@ -42,5 +42,10 @@ futures = "0.3"
 sha2 = "0.10"
 async-stream = "0.3"
 
+# Signing
+hmac = "0.12"
+hex = "0.4"
+subtle = "2"
+
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

@@ -40,6 +40,7 @@ pub mod plugin;
 pub mod protocol;
 pub mod server;
 pub mod session_manager;
+pub mod signing;
 pub mod types;
 
 pub use adapter::LdpAdapter;
@@ -49,4 +50,5 @@ pub use plugin::{create_adapter, register_ldp};
 pub use protocol::{ProtocolAdapter, ProtocolRegistry, RemoteCapabilities, TaskRequest};
 pub use server::LdpServer;
 pub use session_manager::SessionManager;
+pub use signing::{apply_signature, sign_envelope, verify_envelope};
 pub use types::*;
