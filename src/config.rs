@@ -1,6 +1,7 @@
 //! LDP adapter configuration.
 
 use crate::types::session::SessionConfig;
+use crate::types::trust::TrustDomain;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for the LDP protocol adapter.
@@ -8,6 +9,10 @@ use serde::{Deserialize, Serialize};
 pub struct LdpAdapterConfig {
     /// This adapter's delegate ID.
     pub delegate_id: String,
+
+    /// Trust domain for this adapter.
+    #[serde(default)]
+    pub trust_domain: TrustDomain,
 
     /// Session configuration defaults.
     #[serde(default)]
@@ -30,6 +35,7 @@ impl Default for LdpAdapterConfig {
     fn default() -> Self {
         Self {
             delegate_id: "ldp:delegate:local".into(),
+            trust_domain: TrustDomain::new("default"),
             session: SessionConfig::default(),
             enforce_trust_domains: true,
             attach_provenance: true,

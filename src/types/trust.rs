@@ -19,11 +19,19 @@ pub struct TrustDomain {
     pub trusted_peers: Vec<String>,
 }
 
+impl Default for TrustDomain {
+    fn default() -> Self {
+        Self::new("default")
+    }
+}
+
 impl TrustDomain {
     /// Create a new trust domain.
     pub fn new(name: impl Into<String>) -> Self {
+        let name = name.into();
+        assert!(!name.is_empty(), "Trust domain name must not be empty");
         Self {
-            name: name.into(),
+            name,
             allow_cross_domain: false,
             trusted_peers: Vec::new(),
         }
@@ -35,6 +43,11 @@ impl TrustDomain {
             return true; // Same domain always trusted.
         }
         self.allow_cross_domain && self.trusted_peers.contains(&peer.to_string())
+    }
+
+    /// Check if two domains mutually trust each other.
+    pub fn mutually_trusts(&self, peer: &TrustDomain) -> bool {
+        self.trusts(&peer.name) && peer.trusts(&self.name)
     }
 }
 
@@ -63,5 +76,46 @@ mod tests {
         };
         assert!(domain.trusts("partner-corp"));
         assert!(!domain.trusts("unknown-corp"));
+    }
+
+    #[test]
+    fn mutual_trust_requires_both_sides() {
+        let domain_a = TrustDomain {
+            name: "acme".into(),
+            allow_cross_domain: true,
+            trusted_peers: vec!["partner".into()],
+        };
+        let domain_b = TrustDomain {
+            name: "partner".into(),
+            allow_cross_domain: true,
+            trusted_peers: vec!["acme".into()],
+        };
+        let domain_c = TrustDomain {
+            name: "partner".into(),
+            allow_cross_domain: true,
+            trusted_peers: vec![],
+        };
+        assert!(domain_a.mutually_trusts(&domain_b));
+        assert!(!domain_a.mutually_trusts(&domain_c));
+    }
+
+    #[test]
+    fn same_domain_mutual_trust() {
+        let domain = TrustDomain::new("acme");
+        let other = TrustDomain::new("acme");
+        assert!(domain.mutually_trusts(&other));
+    }
+
+    #[test]
+    fn default_trust_domain() {
+        let domain = TrustDomain::default();
+        assert_eq!(domain.name, "default");
+        assert!(!domain.allow_cross_domain);
+    }
+
+    #[test]
+    #[should_panic(expected = "Trust domain name must not be empty")]
+    fn empty_name_panics() {
+        TrustDomain::new("");
     }
 }
