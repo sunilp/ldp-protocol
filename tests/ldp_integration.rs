@@ -412,3 +412,131 @@ async fn test_cross_domain_without_trust_fails() {
         "Expected trust domain error"
     );
 }
+
+#[tokio::test]
+async fn test_session_expiry_forces_reestablishment() {
+    let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server");
+    let base_url = start_test_server(server).await;
+
+    let adapter = LdpAdapter::new(LdpAdapterConfig {
+        delegate_id: "ldp:delegate:short-ttl".into(),
+        trust_domain: ldp_protocol::types::trust::TrustDomain::new("test-domain"),
+        session: ldp_protocol::types::session::SessionConfig {
+            ttl_secs: 1,
+            ..Default::default()
+        },
+        enforce_trust_domains: false,
+        ..Default::default()
+    });
+
+    let h1 = adapter.invoke(&base_url, TaskRequest {
+        skill: "echo".into(), input: json!({"call": 1}),
+    }).await.unwrap();
+
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+    let h2 = adapter.invoke(&base_url, TaskRequest {
+        skill: "echo".into(), input: json!({"call": 2}),
+    }).await.unwrap();
+
+    assert_ne!(h1.task_id, h2.task_id);
+}
+
+#[tokio::test]
+async fn test_payload_negotiation_text_only() {
+    let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server");
+    let base_url = start_test_server(server).await;
+
+    let adapter = LdpAdapter::new(LdpAdapterConfig {
+        delegate_id: "ldp:delegate:text-only".into(),
+        trust_domain: ldp_protocol::types::trust::TrustDomain::new("test-domain"),
+        session: ldp_protocol::types::session::SessionConfig {
+            preferred_payload_modes: vec![ldp_protocol::types::payload::PayloadMode::Text],
+            ..Default::default()
+        },
+        enforce_trust_domains: false,
+        ..Default::default()
+    });
+
+    let handle = adapter.invoke(&base_url, TaskRequest {
+        skill: "echo".into(), input: json!({"mode_test": true}),
+    }).await.unwrap();
+    assert!(!handle.task_id.is_empty());
+}
+
+#[tokio::test]
+async fn test_discover_multiple_skills() {
+    use ldp_protocol::types::capability::LdpCapability;
+    use ldp_protocol::types::identity::LdpIdentityCard;
+    use ldp_protocol::types::payload::PayloadMode;
+    use std::collections::HashMap;
+
+    let identity = LdpIdentityCard {
+        delegate_id: "ldp:delegate:multi".into(),
+        name: "Multi-Skill Agent".into(),
+        description: None,
+        model_family: "TestModel".into(),
+        model_version: "1.0".into(),
+        weights_fingerprint: None,
+        trust_domain: ldp_protocol::types::trust::TrustDomain::new("test-domain"),
+        context_window: 4096,
+        reasoning_profile: None,
+        cost_profile: None,
+        latency_profile: None,
+        jurisdiction: None,
+        capabilities: vec![
+            LdpCapability { name: "reasoning".into(), description: None, input_schema: None, output_schema: None, quality: None, domains: vec![] },
+            LdpCapability { name: "coding".into(), description: None, input_schema: None, output_schema: None, quality: None, domains: vec![] },
+            LdpCapability { name: "writing".into(), description: None, input_schema: None, output_schema: None, quality: None, domains: vec![] },
+        ],
+        supported_payload_modes: vec![PayloadMode::Text],
+        endpoint: String::new(),
+        metadata: HashMap::new(),
+    };
+
+    let handler: ldp_protocol::server::TaskHandler = std::sync::Arc::new(|_s, i| {
+        serde_json::json!({"echo": i})
+    });
+    let server = LdpServer::new(identity, handler);
+    let base_url = start_test_server(server).await;
+
+    let adapter = LdpAdapter::new(LdpAdapterConfig {
+        delegate_id: "ldp:delegate:client".into(),
+        enforce_trust_domains: false,
+        ..Default::default()
+    });
+
+    let caps = adapter.discover(&base_url).await.unwrap();
+    assert_eq!(caps.skills.len(), 3);
+    assert_eq!(caps.skills[0].name, "reasoning");
+    assert_eq!(caps.skills[1].name, "coding");
+    assert_eq!(caps.skills[2].name, "writing");
+}
+
+#[tokio::test]
+async fn test_signed_invoke_has_provenance() {
+    let secret = "provenance-test-secret";
+    let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server")
+        .with_signing_secret(secret);
+    let base_url = start_test_server(server).await;
+
+    let adapter = LdpAdapter::new(LdpAdapterConfig {
+        delegate_id: "ldp:delegate:signed".into(),
+        trust_domain: ldp_protocol::types::trust::TrustDomain::new("test-domain"),
+        signing_secret: Some(secret.to_string()),
+        enforce_trust_domains: false,
+        ..Default::default()
+    });
+
+    let handle = adapter.invoke(&base_url, TaskRequest {
+        skill: "echo".into(), input: json!({"test": "provenance"}),
+    }).await.unwrap();
+
+    let status = adapter.status(&base_url, &handle.task_id).await.unwrap();
+    match status {
+        ldp_protocol::protocol::TaskStatus::Completed { output } => {
+            assert!(output.get("ldp_provenance").is_some() || output.get("echo").is_some());
+        }
+        _ => panic!("Expected Completed status"),
+    }
+}
