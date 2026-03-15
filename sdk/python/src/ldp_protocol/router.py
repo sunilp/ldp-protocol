@@ -7,6 +7,7 @@ from typing import Any
 
 from ldp_protocol.client import LdpClient
 from ldp_protocol.types.identity import LdpIdentityCard
+from ldp_protocol.types.trust import TrustDomain
 
 
 class RoutingStrategy(str, Enum):
@@ -43,15 +44,23 @@ class LdpRouter:
         self,
         client: LdpClient | None = None,
         delegate_id: str = "ldp:router:default",
+        trust_domain: TrustDomain | None = None,
+        enforce_trust_domains: bool = True,
     ):
         self._client = client
         self._own_client = client is None
         self._delegate_id = delegate_id
+        self._trust_domain = trust_domain
+        self._enforce_trust_domains = enforce_trust_domains
         self.delegates: dict[str, LdpIdentityCard] = {}
 
     async def __aenter__(self) -> LdpRouter:
         if self._client is None:
-            self._client = LdpClient(delegate_id=self._delegate_id)
+            self._client = LdpClient(
+                delegate_id=self._delegate_id,
+                trust_domain=self._trust_domain,
+                enforce_trust_domains=self._enforce_trust_domains,
+            )
         return self
 
     async def __aexit__(self, *args) -> None:
@@ -61,7 +70,11 @@ class LdpRouter:
     @property
     def client(self) -> LdpClient:
         if self._client is None:
-            self._client = LdpClient(delegate_id=self._delegate_id)
+            self._client = LdpClient(
+                delegate_id=self._delegate_id,
+                trust_domain=self._trust_domain,
+                enforce_trust_domains=self._enforce_trust_domains,
+            )
         return self._client
 
     async def discover_delegates(self, urls: list[str]) -> list[LdpIdentityCard]:

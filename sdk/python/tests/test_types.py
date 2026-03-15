@@ -76,6 +76,42 @@ class TestTrustDomain:
         assert domain.trusts("partner-corp")
         assert not domain.trusts("unknown-corp")
 
+    def test_mutual_trust_both_sides(self):
+        domain_a = TrustDomain(name="acme", allow_cross_domain=True, trusted_peers=["partner"])
+        domain_b = TrustDomain(name="partner", allow_cross_domain=True, trusted_peers=["acme"])
+        assert domain_a.mutually_trusts(domain_b)
+
+    def test_mutual_trust_one_sided_fails(self):
+        domain_a = TrustDomain(name="acme", allow_cross_domain=True, trusted_peers=["partner"])
+        domain_c = TrustDomain(name="partner", allow_cross_domain=True, trusted_peers=[])
+        assert not domain_a.mutually_trusts(domain_c)
+
+    def test_same_domain_mutual_trust(self):
+        domain = TrustDomain(name="acme")
+        other = TrustDomain(name="acme")
+        assert domain.mutually_trusts(other)
+
+    def test_empty_trust_domain_name_rejected(self):
+        import pytest
+        with pytest.raises(Exception):
+            TrustDomain(name="")
+
+    def test_empty_trusted_peers_blocks_cross_domain(self):
+        domain = TrustDomain(name="acme", allow_cross_domain=True, trusted_peers=[])
+        assert not domain.trusts("anyone")
+
+    def test_allow_cross_domain_false_blocks_even_listed_peer(self):
+        domain = TrustDomain(name="acme", allow_cross_domain=False, trusted_peers=["partner"])
+        assert not domain.trusts("partner")
+
+    def test_trust_domain_serialization(self):
+        domain = TrustDomain(name="acme", allow_cross_domain=True, trusted_peers=["a", "b"])
+        data = domain.model_dump()
+        restored = TrustDomain.model_validate(data)
+        assert restored.trusts("a")
+        assert restored.trusts("b")
+        assert not restored.trusts("c")
+
 
 class TestIdentityCard:
     def _make_card(self) -> LdpIdentityCard:

@@ -127,6 +127,21 @@ class LdpDelegate(ABC):
         )
 
     def _handle_session_propose(self, envelope: LdpEnvelope) -> LdpEnvelope:
+        # Validate trust domain
+        remote_domain = "unknown"
+        if envelope.body.config and "trust_domain" in envelope.body.config:
+            remote_domain = envelope.body.config["trust_domain"]
+
+        if not self.identity.trust_domain.trusts(remote_domain):
+            return LdpEnvelope.create(
+                session_id=envelope.session_id,
+                from_id=self.identity.delegate_id,
+                to_id=envelope.from_,
+                body=LdpMessageBody.session_reject(
+                    reason=f"Trust domain '{remote_domain}' not trusted by '{self.identity.trust_domain.name}'"
+                ),
+            )
+
         session_id = str(uuid4())
         # Negotiate payload mode
         initiator_modes = []

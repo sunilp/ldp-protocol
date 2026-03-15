@@ -35,9 +35,13 @@ class LdpClient:
         delegate_id: str = "ldp:client:default",
         config: SessionConfig | None = None,
         timeout: float = 30.0,
+        trust_domain: TrustDomain | None = None,
+        enforce_trust_domains: bool = True,
     ):
         self.delegate_id = delegate_id
         self.config = config or SessionConfig()
+        self.trust_domain = trust_domain or TrustDomain(name="default")
+        self.enforce_trust_domains = enforce_trust_domains
         self._http = httpx.AsyncClient(timeout=timeout)
         self._sessions: dict[str, LdpSession] = {}
 
@@ -59,11 +63,23 @@ class LdpClient:
 
         Returns:
             The delegate's identity card with full metadata.
+
+        Raises:
+            ConnectionError: If trust domain validation fails.
         """
         endpoint = f"{url.rstrip('/')}/ldp/identity"
         resp = await self._http.get(endpoint)
         resp.raise_for_status()
-        return LdpIdentityCard.model_validate(resp.json())
+        identity = LdpIdentityCard.model_validate(resp.json())
+
+        if self.enforce_trust_domains:
+            if not self.trust_domain.trusts(identity.trust_domain.name):
+                raise ConnectionError(
+                    f"Trust domain '{identity.trust_domain.name}' "
+                    f"is not trusted by '{self.trust_domain.name}'"
+                )
+
+        return identity
 
     async def send_message(self, url: str, envelope: LdpEnvelope) -> LdpEnvelope:
         """Send an LDP message and receive a response."""
@@ -105,6 +121,7 @@ class LdpClient:
                         m.value for m in self.config.preferred_payload_modes
                     ],
                     "ttl_secs": self.config.ttl_secs,
+                    "trust_domain": self.trust_domain.name,
                 }
             ),
         )
