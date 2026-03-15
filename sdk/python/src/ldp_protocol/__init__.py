@@ -11,6 +11,7 @@ from ldp_protocol.types import (
     ClaimType,
     DelegationContract,
     ErrorSeverity,
+    EvidenceRef,
     FailureCategory,
     FailurePolicy,
     LdpCapability,
@@ -23,10 +24,12 @@ from ldp_protocol.types import (
     PayloadMode,
     PolicyEnvelope,
     Provenance,
+    ProvenanceEntry,
     QualityMetrics,
     SessionConfig,
     SessionState,
     TrustDomain,
+    VerificationStatus,
 )
 from ldp_protocol.client import ContractViolationError, LdpClient
 from ldp_protocol.delegate import LdpDelegate
@@ -49,6 +52,9 @@ __all__ = [
     "PolicyEnvelope",
     "QualityMetrics",
     "TrustDomain",
+    "VerificationStatus",
+    "EvidenceRef",
+    "ProvenanceEntry",
     "PayloadMode",
     "NegotiatedPayload",
     "SessionConfig",

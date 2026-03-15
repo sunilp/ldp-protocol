@@ -7,6 +7,7 @@ from ldp_protocol.types.contract import DelegationContract, PolicyEnvelope, Fail
 from ldp_protocol.types.error import ErrorSeverity, FailureCategory, LdpError
 from ldp_protocol.types.identity import LdpIdentityCard
 from ldp_protocol.types.provenance import Provenance
+from ldp_protocol.types.verification import EvidenceRef, ProvenanceEntry, VerificationStatus
 from ldp_protocol.types.session import LdpSession, SessionConfig, SessionState
 from ldp_protocol.types.messages import LdpEnvelope, LdpMessageBody
 
@@ -27,6 +28,9 @@ __all__ = [
     "LdpError",
     "LdpIdentityCard",
     "Provenance",
+    "VerificationStatus",
+    "EvidenceRef",
+    "ProvenanceEntry",
     "LdpSession",
     "SessionConfig",
     "SessionState",

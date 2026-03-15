@@ -522,3 +522,63 @@ class TestMessagesAdvanced:
         env.signature_algorithm = "hmac-sha256"
         data = env.model_dump(by_alias=True)
         assert data["signature"] == "abc123"
+
+
+from ldp_protocol.types.verification import VerificationStatus, EvidenceRef, ProvenanceEntry
+
+
+class TestVerificationStatus:
+    def test_default_is_unverified(self):
+        assert VerificationStatus.UNVERIFIED == "unverified"
+
+    def test_all_variants(self):
+        assert VerificationStatus.SELF_VERIFIED == "self_verified"
+        assert VerificationStatus.PEER_VERIFIED == "peer_verified"
+        assert VerificationStatus.TOOL_VERIFIED == "tool_verified"
+        assert VerificationStatus.HUMAN_VERIFIED == "human_verified"
+
+
+class TestEvidenceRef:
+    def test_creation(self):
+        e = EvidenceRef(source="pytest", kind="test_results", uri="https://ci/123")
+        assert e.source == "pytest"
+
+    def test_serialization(self):
+        e = EvidenceRef(source="validator", kind="peer_review", summary="Looks good")
+        data = e.model_dump()
+        restored = EvidenceRef.model_validate(data)
+        assert restored.source == "validator"
+
+
+class TestProvenanceEntry:
+    def test_creation(self):
+        entry = ProvenanceEntry(
+            delegate_id="d1", model_version="v1", step="reasoning",
+            verification_status=VerificationStatus.SELF_VERIFIED,
+        )
+        assert entry.step == "reasoning"
+
+
+class TestProvenanceVerification:
+    def test_new_provenance_is_unverified(self):
+        p = Provenance.create("d1", "v1")
+        assert p.verification_status == VerificationStatus.UNVERIFIED
+        assert p.evidence == []
+        assert p.lineage == []
+
+    def test_normalize_syncs_verified_to_status(self):
+        p = Provenance.create("d1", "v1", verification_status=VerificationStatus.PEER_VERIFIED)
+        assert p.verified is True
+
+    def test_normalize_syncs_old_verified_true(self):
+        p = Provenance.model_validate({
+            "produced_by": "d1", "model_version": "v1",
+            "payload_mode_used": "text", "verified": True,
+        })
+        assert p.verification_status == VerificationStatus.SELF_VERIFIED
+
+    def test_backward_compat_no_verification_fields(self):
+        old = {"produced_by": "d1", "model_version": "v1", "payload_mode_used": "text", "verified": False}
+        p = Provenance.model_validate(old)
+        assert p.verification_status == VerificationStatus.UNVERIFIED
+        assert p.lineage == []

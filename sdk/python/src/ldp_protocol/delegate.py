@@ -13,6 +13,7 @@ from ldp_protocol.types.messages import LdpEnvelope, LdpMessageBody
 from ldp_protocol.types.payload import PayloadMode, negotiate_payload_mode
 from ldp_protocol.types.provenance import Provenance
 from ldp_protocol.types.trust import TrustDomain
+from ldp_protocol.types.verification import VerificationStatus
 
 
 class LdpDelegate(ABC):
@@ -205,6 +206,7 @@ class LdpDelegate(ABC):
                 confidence=confidence,
                 payload_mode_used=envelope.payload_mode,
                 session_id=envelope.session_id,
+                verification_status=VerificationStatus.SELF_VERIFIED,
             )
 
             return LdpEnvelope.create(
