@@ -4,6 +4,7 @@
 //! which model, what payload mode, confidence, and verification status.
 
 use crate::types::payload::PayloadMode;
+use crate::types::verification::{VerificationStatus, EvidenceRef, ProvenanceEntry};
 use serde::{Deserialize, Serialize};
 
 /// Provenance metadata attached to every LDP task result.
@@ -25,6 +26,8 @@ pub struct Provenance {
     pub confidence: Option<f64>,
 
     /// Whether the result has been verified (e.g. by a second delegate).
+    #[deprecated(note = "Use verification_status instead")]
+    #[serde(default)]
     pub verified: bool,
 
     /// Session ID in which this result was produced.
@@ -52,10 +55,23 @@ pub struct Provenance {
     /// List of contract violation codes (set by client-side validation).
     #[serde(default)]
     pub contract_violations: Vec<String>,
+
+    /// Granular verification status.
+    #[serde(default)]
+    pub verification_status: VerificationStatus,
+
+    /// Supporting evidence references.
+    #[serde(default)]
+    pub evidence: Vec<EvidenceRef>,
+
+    /// Delegation lineage chain (newest hop first).
+    #[serde(default)]
+    pub lineage: Vec<ProvenanceEntry>,
 }
 
 impl Provenance {
     /// Create a new provenance record.
+    #[allow(deprecated)]
     pub fn new(delegate_id: impl Into<String>, model_version: impl Into<String>) -> Self {
         Self {
             produced_by: delegate_id.into(),
@@ -70,6 +86,21 @@ impl Provenance {
             contract_id: None,
             contract_satisfied: None,
             contract_violations: Vec::new(),
+            verification_status: VerificationStatus::Unverified,
+            evidence: Vec::new(),
+            lineage: Vec::new(),
+        }
+    }
+
+    /// Sync verified bool with verification_status.
+    /// verification_status is authoritative.
+    pub fn normalize(&mut self) {
+        #[allow(deprecated)]
+        {
+            if self.verification_status == VerificationStatus::Unverified && self.verified {
+                self.verification_status = VerificationStatus::SelfVerified;
+            }
+            self.verified = self.verification_status != VerificationStatus::Unverified;
         }
     }
 
@@ -116,5 +147,50 @@ mod tests {
         assert_eq!(p.produced_by, "d1");
         assert!(p.contract_id.is_none());
         assert!(p.contract_violations.is_empty());
+    }
+
+    #[test]
+    fn provenance_new_has_unverified_status() {
+        let p = Provenance::new("d1", "v1");
+        assert_eq!(p.verification_status, VerificationStatus::Unverified);
+        assert!(p.evidence.is_empty());
+        assert!(p.lineage.is_empty());
+    }
+
+    #[test]
+    fn provenance_normalize_syncs_verified_to_status() {
+        let mut p = Provenance::new("d1", "v1");
+        p.verification_status = VerificationStatus::PeerVerified;
+        p.normalize();
+        #[allow(deprecated)]
+        {
+            assert!(p.verified);
+        }
+    }
+
+    #[test]
+    fn provenance_normalize_syncs_old_verified_true() {
+        let mut p = Provenance::new("d1", "v1");
+        #[allow(deprecated)]
+        {
+            p.verified = true;
+        }
+        p.normalize();
+        assert_eq!(p.verification_status, VerificationStatus::SelfVerified);
+    }
+
+    #[test]
+    fn provenance_backward_compat_no_verification_fields() {
+        let old_json = serde_json::json!({
+            "produced_by": "d1",
+            "model_version": "v1",
+            "payload_mode_used": "text",
+            "verified": true
+        });
+        let mut p: Provenance = serde_json::from_value(old_json).unwrap();
+        p.normalize();
+        assert_eq!(p.verification_status, VerificationStatus::SelfVerified);
+        assert!(p.evidence.is_empty());
+        assert!(p.lineage.is_empty());
     }
 }
