@@ -25,6 +25,10 @@ pub struct LdpAdapterConfig {
     /// Whether to attach provenance to all task results.
     #[serde(default = "default_true")]
     pub attach_provenance: bool,
+
+    /// Shared secret for HMAC message signing. If None, signing is disabled.
+    #[serde(default)]
+    pub signing_secret: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -39,6 +43,7 @@ impl Default for LdpAdapterConfig {
             session: SessionConfig::default(),
             enforce_trust_domains: true,
             attach_provenance: true,
+            signing_secret: None,
         }
     }
 }

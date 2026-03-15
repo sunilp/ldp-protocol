@@ -39,6 +39,8 @@ pub struct LdpServer {
     tasks: Arc<RwLock<HashMap<String, TaskRecord>>>,
     /// Pluggable task handler.
     handler: TaskHandler,
+    /// Shared secret for HMAC message signing. If None, signing is disabled.
+    signing_secret: Option<String>,
 }
 
 /// Internal task tracking record.
@@ -69,7 +71,14 @@ impl LdpServer {
             sessions: Arc::new(RwLock::new(HashMap::new())),
             tasks: Arc::new(RwLock::new(HashMap::new())),
             handler,
+            signing_secret: None,
         }
+    }
+
+    /// Set a signing secret for HMAC message signing (builder pattern).
+    pub fn with_signing_secret(mut self, secret: impl Into<String>) -> Self {
+        self.signing_secret = Some(secret.into());
+        self
     }
 
     /// Create a test server with an echo handler (returns input as output).
@@ -129,7 +138,19 @@ impl LdpServer {
     ///
     /// Processes the incoming LDP envelope and returns a response envelope.
     pub async fn handle_message(&self, envelope: LdpEnvelope) -> Result<LdpEnvelope, String> {
-        match &envelope.body {
+        // Verify signature if signing is configured
+        if let Some(ref secret) = self.signing_secret {
+            if let Some(ref sig) = envelope.signature {
+                if !crate::signing::verify_envelope(&envelope, secret, sig) {
+                    return Err("Invalid message signature".to_string());
+                }
+            } else if !matches!(envelope.body, LdpMessageBody::Hello { .. }) {
+                // Allow unsigned HELLO (first contact), require signatures after
+                return Err("Message signature required but not provided".to_string());
+            }
+        }
+
+        let mut response = match &envelope.body {
             LdpMessageBody::Hello { delegate_id, supported_modes } => {
                 self.handle_hello(&envelope, delegate_id, supported_modes).await
             }
@@ -149,7 +170,14 @@ impl LdpServer {
                 self.handle_session_close(&envelope).await
             }
             _ => Err(format!("Unhandled message type")),
+        }?;
+
+        // Sign outgoing response
+        if let Some(ref secret) = self.signing_secret {
+            crate::signing::apply_signature(&mut response, secret);
         }
+
+        Ok(response)
     }
 
     /// Handle HELLO — respond with CAPABILITY_MANIFEST.

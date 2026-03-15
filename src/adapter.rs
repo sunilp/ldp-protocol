@@ -152,7 +152,7 @@ impl ProtocolAdapter for LdpAdapter {
 
         // Step 2: Send TASK_SUBMIT.
         let task_id = uuid::Uuid::new_v4().to_string();
-        let submit = LdpEnvelope::new(
+        let mut submit = LdpEnvelope::new(
             &session.session_id,
             &self.config.delegate_id,
             &session.remote_delegate_id,
@@ -163,6 +163,11 @@ impl ProtocolAdapter for LdpAdapter {
             },
             session.payload.mode,
         );
+
+        // Sign if configured
+        if let Some(ref secret) = self.config.signing_secret {
+            crate::signing::apply_signature(&mut submit, secret);
+        }
 
         let _response = self.client.send_message(url, &submit).await?;
 
@@ -197,7 +202,7 @@ impl ProtocolAdapter for LdpAdapter {
                 interval.tick().await;
 
                 // Build a status query envelope.
-                let status_query = LdpEnvelope::new(
+                let mut status_query = LdpEnvelope::new(
                     "",
                     &config.delegate_id,
                     &url,
@@ -208,6 +213,11 @@ impl ProtocolAdapter for LdpAdapter {
                     },
                     crate::types::payload::PayloadMode::Text,
                 );
+
+                // Sign if configured
+                if let Some(ref secret) = config.signing_secret {
+                    crate::signing::apply_signature(&mut status_query, secret);
+                }
 
                 match client.send_message(&url, &status_query).await {
                     Ok(response) => match response.body {
@@ -258,7 +268,7 @@ impl ProtocolAdapter for LdpAdapter {
     async fn status(&self, url: &str, task_id: &str) -> Result<TaskStatus, String> {
         debug!(task_id = %task_id, "Polling LDP task status");
 
-        let query = LdpEnvelope::new(
+        let mut query = LdpEnvelope::new(
             "",
             &self.config.delegate_id,
             url,
@@ -269,6 +279,11 @@ impl ProtocolAdapter for LdpAdapter {
             },
             crate::types::payload::PayloadMode::Text,
         );
+
+        // Sign if configured
+        if let Some(ref secret) = self.config.signing_secret {
+            crate::signing::apply_signature(&mut query, secret);
+        }
 
         let response = self.client.send_message(url, &query).await?;
 
@@ -295,7 +310,7 @@ impl ProtocolAdapter for LdpAdapter {
     async fn cancel(&self, url: &str, task_id: &str) -> Result<(), String> {
         info!(task_id = %task_id, "Cancelling LDP task");
 
-        let cancel_msg = LdpEnvelope::new(
+        let mut cancel_msg = LdpEnvelope::new(
             "",
             &self.config.delegate_id,
             url,
@@ -304,6 +319,11 @@ impl ProtocolAdapter for LdpAdapter {
             },
             crate::types::payload::PayloadMode::Text,
         );
+
+        // Sign if configured
+        if let Some(ref secret) = self.config.signing_secret {
+            crate::signing::apply_signature(&mut cancel_msg, secret);
+        }
 
         self.client.send_message(url, &cancel_msg).await?;
         Ok(())

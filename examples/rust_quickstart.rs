@@ -29,6 +29,7 @@ async fn main() {
         },
         enforce_trust_domains: false,
         attach_provenance: true,
+        signing_secret: None,
     };
 
     println!("Config: delegate_id={}", config.delegate_id);

@@ -343,6 +343,53 @@ async fn test_wellknown_discovery() {
 }
 
 #[tokio::test]
+async fn test_signed_messages() {
+    let secret = "shared-test-secret";
+    let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server")
+        .with_signing_secret(secret);
+    let base_url = start_test_server(server).await;
+
+    let adapter = LdpAdapter::new(LdpAdapterConfig {
+        delegate_id: "ldp:delegate:signed-client".into(),
+        trust_domain: ldp_protocol::types::trust::TrustDomain::new("test-domain"),
+        signing_secret: Some(secret.to_string()),
+        enforce_trust_domains: false,
+        ..Default::default()
+    });
+
+    let task = TaskRequest {
+        skill: "echo".into(),
+        input: json!({"signed": true}),
+    };
+
+    let handle = adapter.invoke(&base_url, task).await.unwrap();
+    assert!(!handle.task_id.is_empty());
+}
+
+#[tokio::test]
+async fn test_wrong_signing_secret_rejected() {
+    let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server")
+        .with_signing_secret("server-secret");
+    let base_url = start_test_server(server).await;
+
+    let adapter = LdpAdapter::new(LdpAdapterConfig {
+        delegate_id: "ldp:delegate:bad-client".into(),
+        trust_domain: ldp_protocol::types::trust::TrustDomain::new("test-domain"),
+        signing_secret: Some("wrong-secret".to_string()),
+        enforce_trust_domains: false,
+        ..Default::default()
+    });
+
+    let task = TaskRequest {
+        skill: "echo".into(),
+        input: json!({}),
+    };
+
+    let result = adapter.invoke(&base_url, task).await;
+    assert!(result.is_err());
+}
+
+#[tokio::test]
 async fn test_cross_domain_without_trust_fails() {
     use ldp_protocol::types::trust::TrustDomain;
 

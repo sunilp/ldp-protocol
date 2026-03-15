@@ -81,7 +81,7 @@ impl SessionManager {
         info!(url = %url, "Establishing new LDP session");
 
         // Step 1: Send HELLO
-        let hello = LdpEnvelope::new(
+        let mut hello = LdpEnvelope::new(
             "", // No session yet
             our_delegate_id,
             url,
@@ -91,6 +91,11 @@ impl SessionManager {
             },
             PayloadMode::Text,
         );
+
+        // Sign if configured
+        if let Some(ref secret) = self.config.signing_secret {
+            crate::signing::apply_signature(&mut hello, secret);
+        }
 
         let hello_response = self.client.send_message(url, &hello).await?;
 
@@ -127,7 +132,7 @@ impl SessionManager {
 
         // Step 4: Send SESSION_PROPOSE (trust is enforced in discover())
         let session_id = uuid::Uuid::new_v4().to_string();
-        let propose = LdpEnvelope::new(
+        let mut propose = LdpEnvelope::new(
             &session_id,
             our_delegate_id,
             &remote_delegate_id,
@@ -140,6 +145,11 @@ impl SessionManager {
             },
             PayloadMode::Text,
         );
+
+        // Sign if configured
+        if let Some(ref secret) = self.config.signing_secret {
+            crate::signing::apply_signature(&mut propose, secret);
+        }
 
         let propose_response = self.client.send_message(url, &propose).await?;
 
