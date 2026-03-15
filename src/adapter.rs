@@ -160,6 +160,7 @@ impl ProtocolAdapter for LdpAdapter {
                 task_id: task_id.clone(),
                 skill: task.skill.clone(),
                 input: task.input.clone(),
+                contract: task.contract.clone(),
             },
             session.payload.mode,
         );

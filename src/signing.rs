@@ -157,6 +157,7 @@ mod tests {
                 task_id: "t1".into(),
                 skill: "echo".into(),
                 input: serde_json::json!({"data": 1}),
+                contract: None,
             },
             PayloadMode::Text,
         );

@@ -157,7 +157,7 @@ impl LdpServer {
             LdpMessageBody::SessionPropose { config } => {
                 self.handle_session_propose(&envelope, config).await
             }
-            LdpMessageBody::TaskSubmit { task_id, skill, input } => {
+            LdpMessageBody::TaskSubmit { task_id, skill, input, .. } => {
                 self.handle_task_submit(&envelope, task_id, skill, input).await
             }
             LdpMessageBody::TaskUpdate { task_id, .. } => {

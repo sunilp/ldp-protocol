@@ -3,6 +3,7 @@
 //! The LDP message envelope wraps all protocol messages with routing,
 //! session context, and provenance metadata.
 
+use crate::types::contract::DelegationContract;
 use crate::types::error::LdpError;
 use crate::types::payload::PayloadMode;
 use crate::types::provenance::Provenance;
@@ -82,6 +83,8 @@ pub enum LdpMessageBody {
         task_id: String,
         skill: String,
         input: Value,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        contract: Option<DelegationContract>,
     },
 
     /// Task progress update.

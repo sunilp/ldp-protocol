@@ -3,6 +3,7 @@
 //! These types define the adapter interface for LDP, allowing it to operate
 //! independently or as a plugin within runtimes like JamJet.
 
+use crate::types::contract::DelegationContract;
 use crate::types::error::LdpError;
 use async_trait::async_trait;
 use futures::Stream;
@@ -43,6 +44,9 @@ pub struct TaskRequest {
     pub skill: String,
     /// Input data for the task.
     pub input: Value,
+    /// Optional delegation contract for bounded task execution.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub contract: Option<DelegationContract>,
 }
 
 /// Handle returned after submitting a task.

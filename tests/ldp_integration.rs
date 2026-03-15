@@ -128,6 +128,7 @@ async fn test_invoke_returns_handle() {
     let task = TaskRequest {
         skill: "echo".into(),
         input: json!({"message": "hello"}),
+        contract: None,
     };
 
     let handle = adapter.invoke(&base_url, task).await.unwrap();
@@ -144,6 +145,7 @@ async fn test_invoke_and_status() {
     let task = TaskRequest {
         skill: "echo".into(),
         input: json!({"value": 42}),
+        contract: None,
     };
 
     let handle = adapter.invoke(&base_url, task).await.unwrap();
@@ -177,6 +179,7 @@ async fn test_session_reuse() {
     let task1 = TaskRequest {
         skill: "echo".into(),
         input: json!({"call": 1}),
+        contract: None,
     };
     let h1 = adapter.invoke(&base_url, task1).await.unwrap();
 
@@ -184,6 +187,7 @@ async fn test_session_reuse() {
     let task2 = TaskRequest {
         skill: "echo".into(),
         input: json!({"call": 2}),
+        contract: None,
     };
     let h2 = adapter.invoke(&base_url, task2).await.unwrap();
 
@@ -203,6 +207,7 @@ async fn test_cancel() {
     let task = TaskRequest {
         skill: "echo".into(),
         input: json!({}),
+        contract: None,
     };
 
     let handle = adapter.invoke(&base_url, task).await.unwrap();
@@ -221,6 +226,7 @@ async fn test_provenance_present_in_output() {
     let task = TaskRequest {
         skill: "echo".into(),
         input: json!({"data": "test"}),
+        contract: None,
     };
 
     let handle = adapter.invoke(&base_url, task).await.unwrap();
@@ -360,6 +366,7 @@ async fn test_signed_messages() {
     let task = TaskRequest {
         skill: "echo".into(),
         input: json!({"signed": true}),
+        contract: None,
     };
 
     let handle = adapter.invoke(&base_url, task).await.unwrap();
@@ -383,6 +390,7 @@ async fn test_wrong_signing_secret_rejected() {
     let task = TaskRequest {
         skill: "echo".into(),
         input: json!({}),
+        contract: None,
     };
 
     let result = adapter.invoke(&base_url, task).await;
@@ -430,13 +438,13 @@ async fn test_session_expiry_forces_reestablishment() {
     });
 
     let h1 = adapter.invoke(&base_url, TaskRequest {
-        skill: "echo".into(), input: json!({"call": 1}),
+        skill: "echo".into(), input: json!({"call": 1}), contract: None,
     }).await.unwrap();
 
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     let h2 = adapter.invoke(&base_url, TaskRequest {
-        skill: "echo".into(), input: json!({"call": 2}),
+        skill: "echo".into(), input: json!({"call": 2}), contract: None,
     }).await.unwrap();
 
     assert_ne!(h1.task_id, h2.task_id);
@@ -459,7 +467,7 @@ async fn test_payload_negotiation_text_only() {
     });
 
     let handle = adapter.invoke(&base_url, TaskRequest {
-        skill: "echo".into(), input: json!({"mode_test": true}),
+        skill: "echo".into(), input: json!({"mode_test": true}), contract: None,
     }).await.unwrap();
     assert!(!handle.task_id.is_empty());
 }
@@ -529,7 +537,7 @@ async fn test_signed_invoke_has_provenance() {
     });
 
     let handle = adapter.invoke(&base_url, TaskRequest {
-        skill: "echo".into(), input: json!({"test": "provenance"}),
+        skill: "echo".into(), input: json!({"test": "provenance"}), contract: None,
     }).await.unwrap();
 
     let status = adapter.status(&base_url, &handle.task_id).await.unwrap();
