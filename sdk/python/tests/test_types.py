@@ -297,3 +297,84 @@ class TestLdpError:
         body = LdpMessageBody.session_reject(err)
         assert body.reason == "Domain not trusted"
         assert body.error.code == "TRUST_VIOLATION"
+
+
+class TestSessionAdvanced:
+    def test_session_expires_after_ttl(self):
+        from datetime import datetime, timezone, timedelta
+        from ldp_protocol.types.session import LdpSession, SessionState
+        session = LdpSession(
+            session_id="s1", remote_url="http://localhost",
+            remote_delegate_id="remote", trust_domain=TrustDomain(name="test"),
+            ttl_secs=1,
+        )
+        session.last_used = datetime.now(timezone.utc) - timedelta(seconds=2)
+        assert not session.is_active
+
+    def test_session_active_within_ttl(self):
+        from ldp_protocol.types.session import LdpSession
+        session = LdpSession(
+            session_id="s1", remote_url="http://localhost",
+            remote_delegate_id="remote", trust_domain=TrustDomain(name="test"),
+            ttl_secs=3600,
+        )
+        assert session.is_active
+
+    def test_closed_session_not_active(self):
+        from ldp_protocol.types.session import LdpSession, SessionState
+        session = LdpSession(
+            session_id="s1", remote_url="http://localhost",
+            remote_delegate_id="remote", state=SessionState.CLOSED,
+            trust_domain=TrustDomain(name="test"),
+        )
+        assert not session.is_active
+
+    def test_session_touch_updates_timestamp(self):
+        import time
+        from ldp_protocol.types.session import LdpSession
+        session = LdpSession(
+            session_id="s1", remote_url="http://localhost",
+            remote_delegate_id="remote", trust_domain=TrustDomain(name="test"),
+        )
+        old_time = session.last_used
+        time.sleep(0.01)
+        session.touch()
+        assert session.last_used >= old_time
+
+    def test_session_config_defaults(self):
+        config = SessionConfig()
+        assert config.ttl_secs == 3600
+        assert PayloadMode.SEMANTIC_FRAME in config.preferred_payload_modes
+        assert config.required_trust_domain is None
+
+
+class TestMessagesAdvanced:
+    def test_all_message_factory_methods(self):
+        types_list = [
+            LdpMessageBody.hello("id", [PayloadMode.TEXT]),
+            LdpMessageBody.capability_manifest({"caps": []}),
+            LdpMessageBody.session_propose({"ttl": 3600}),
+            LdpMessageBody.session_accept("s1", PayloadMode.TEXT),
+            LdpMessageBody.session_reject("no"),
+            LdpMessageBody.task_submit("t1", "echo", {"data": 1}),
+            LdpMessageBody.task_update("t1", progress=0.5, message="working"),
+            LdpMessageBody.task_result("t1", {"out": 1}, Provenance.create("d1", "v1")),
+            LdpMessageBody.task_failed("t1", "error"),
+            LdpMessageBody.task_cancel("t1"),
+            LdpMessageBody.session_close("done"),
+        ]
+        for body in types_list:
+            assert body.type is not None
+            data = body.model_dump()
+            restored = LdpMessageBody.model_validate(data)
+            assert restored.type == body.type
+
+    def test_envelope_with_signature_fields(self):
+        body = LdpMessageBody.hello("test", [PayloadMode.TEXT])
+        env = LdpEnvelope.create("s1", "a", "b", body)
+        assert env.signature is None
+        assert env.signature_algorithm is None
+        env.signature = "abc123"
+        env.signature_algorithm = "hmac-sha256"
+        data = env.model_dump(by_alias=True)
+        assert data["signature"] == "abc123"

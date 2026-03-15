@@ -135,3 +135,27 @@ class TestRouter:
         assert len(delegates) == 3
         delegates = router.list_delegates(skill="cooking")
         assert len(delegates) == 0
+
+
+class TestRouterEdgeCases:
+    def _make_router(self) -> LdpRouter:
+        router = LdpRouter()
+        router.delegates = _make_delegates()
+        return router
+
+    def test_select_balanced_picks_best_ratio(self):
+        router = self._make_router()
+        best = router.select("reasoning", RoutingStrategy.BALANCED)
+        assert best is not None
+        assert best.delegate_id == "ldp:delegate:fast"
+
+    def test_list_delegates_includes_quality_scores(self):
+        router = self._make_router()
+        delegates = router.list_delegates(skill="reasoning")
+        for d in delegates:
+            assert "quality_scores" in d
+            assert "reasoning" in d["quality_scores"]
+
+    def test_select_empty_delegates(self):
+        router = LdpRouter()
+        assert router.select("anything") is None
