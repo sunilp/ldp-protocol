@@ -55,6 +55,10 @@ async fn handle_connection(stream: tokio::net::TcpStream, server: Arc<LdpServer>
     let path = parts[1];
 
     let (status, body) = match (method, path) {
+        ("GET", "/.well-known/ldp-identity") => {
+            let identity = server.handle_identity_request();
+            ("200 OK", serde_json::to_string(&identity).unwrap())
+        }
         ("GET", "/ldp/identity") => {
             let identity = server.handle_identity_request();
             ("200 OK", serde_json::to_string(&identity).unwrap())
@@ -325,6 +329,17 @@ async fn test_cross_domain_with_trusted_peer_succeeds() {
     // Discovery should succeed because acme trusts partner.
     let caps = adapter.discover(&base_url).await.unwrap();
     assert_eq!(caps.name, "Partner Server");
+}
+
+#[tokio::test]
+async fn test_wellknown_discovery() {
+    let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server");
+    let base_url = start_test_server(server).await;
+
+    let client = ldp_protocol::LdpClient::new();
+    let identity = client.fetch_identity_wellknown(&base_url).await.unwrap();
+    assert_eq!(identity.delegate_id, "ldp:delegate:echo");
+    assert_eq!(identity.name, "Echo Server");
 }
 
 #[tokio::test]

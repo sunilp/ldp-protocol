@@ -81,6 +81,27 @@ class LdpClient:
 
         return identity
 
+    async def discover_wellknown(self, url: str) -> LdpIdentityCard:
+        """Discover a delegate via .well-known/ldp-identity convention.
+
+        Tries .well-known first, falls back to /ldp/identity.
+        """
+        wellknown = f"{url.rstrip('/')}/.well-known/ldp-identity"
+        try:
+            resp = await self._http.get(wellknown)
+            resp.raise_for_status()
+            identity = LdpIdentityCard.model_validate(resp.json())
+            # Only check trust here — fallback path checks in discover()
+            if self.enforce_trust_domains:
+                if not self.trust_domain.trusts(identity.trust_domain.name):
+                    raise ConnectionError(
+                        f"Trust domain '{identity.trust_domain.name}' "
+                        f"is not trusted by '{self.trust_domain.name}'"
+                    )
+            return identity
+        except Exception:
+            return await self.discover(url)
+
     async def send_message(self, url: str, envelope: LdpEnvelope) -> LdpEnvelope:
         """Send an LDP message and receive a response."""
         endpoint = f"{url.rstrip('/')}/ldp/messages"

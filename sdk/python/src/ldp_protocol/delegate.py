@@ -254,6 +254,7 @@ class LdpDelegate(ABC):
 
         app = Starlette(
             routes=[
+                Route("/.well-known/ldp-identity", handle_identity, methods=["GET"]),
                 Route("/ldp/identity", handle_identity, methods=["GET"]),
                 Route("/ldp/capabilities", handle_capabilities, methods=["GET"]),
                 Route("/ldp/messages", handle_messages, methods=["POST"]),

@@ -98,6 +98,20 @@ impl LdpClient {
         Ok(card)
     }
 
+    /// Fetch identity via .well-known convention.
+    ///
+    /// Tries `{url}/.well-known/ldp-identity` first, falls back to `{url}/ldp/identity`.
+    pub async fn fetch_identity_wellknown(&self, url: &str) -> Result<LdpIdentityCard, String> {
+        let wellknown = format!("{}/.well-known/ldp-identity", url.trim_end_matches('/'));
+
+        match self.http.get(&wellknown).send().await {
+            Ok(resp) if resp.status().is_success() => {
+                resp.json().await.map_err(|e| format!("Failed to parse identity: {e}"))
+            }
+            _ => self.fetch_identity_card(url).await,
+        }
+    }
+
     /// Fetch raw capabilities from a remote delegate.
     ///
     /// Capabilities are served at `{url}/ldp/capabilities`.
