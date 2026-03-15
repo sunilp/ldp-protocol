@@ -11,7 +11,7 @@ pub mod provenance;
 pub mod session;
 pub mod trust;
 
-pub use capability::{LdpCapability, QualityMetrics};
+pub use capability::{LdpCapability, QualityMetrics, ClaimType};
 pub use identity::LdpIdentityCard;
 pub use messages::{LdpEnvelope, LdpMessageBody};
 pub use payload::PayloadMode;

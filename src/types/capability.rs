@@ -6,6 +6,26 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+/// How a quality claim was established — addresses the provenance paradox.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ClaimType {
+    /// Quality scores reported by the delegate itself.
+    SelfClaimed,
+    /// Quality scores attested by a trusted third-party issuer.
+    IssuerAttested,
+    /// Quality scores measured by the LDP runtime during actual invocations.
+    RuntimeObserved,
+    /// Quality scores verified by an external benchmarking service.
+    ExternallyBenchmarked,
+}
+
+impl Default for ClaimType {
+    fn default() -> Self {
+        ClaimType::SelfClaimed
+    }
+}
+
 /// An LDP capability — a skill with quality/latency/cost metadata.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LdpCapability {
@@ -52,6 +72,10 @@ pub struct QualityMetrics {
 
     /// Whether this capability supports streaming responses.
     pub supports_streaming: bool,
+
+    /// How this quality claim was established.
+    #[serde(default)]
+    pub claim_type: ClaimType,
 }
 
 impl Default for QualityMetrics {
@@ -63,6 +87,39 @@ impl Default for QualityMetrics {
             cost_per_call_usd: None,
             max_tokens: None,
             supports_streaming: false,
+            claim_type: ClaimType::default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_claim_type_is_self_claimed() {
+        let metrics = QualityMetrics::default();
+        assert_eq!(metrics.claim_type, ClaimType::SelfClaimed);
+    }
+
+    #[test]
+    fn claim_type_serialization() {
+        let metrics = QualityMetrics {
+            claim_type: ClaimType::IssuerAttested,
+            quality_score: Some(0.95),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&metrics).unwrap();
+        assert_eq!(json["claim_type"], "issuer_attested");
+        let restored: QualityMetrics = serde_json::from_value(json).unwrap();
+        assert_eq!(restored.claim_type, ClaimType::IssuerAttested);
+    }
+
+    #[test]
+    fn all_claim_types_exist() {
+        let _ = ClaimType::SelfClaimed;
+        let _ = ClaimType::IssuerAttested;
+        let _ = ClaimType::RuntimeObserved;
+        let _ = ClaimType::ExternallyBenchmarked;
     }
 }
