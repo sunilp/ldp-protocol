@@ -13,13 +13,50 @@ use crate::protocol::{
     TaskStatus, TaskStream,
 };
 use crate::session_manager::SessionManager;
+use crate::types::contract::{DelegationContract, FailurePolicy};
 use crate::types::error::LdpError;
 use crate::types::messages::{LdpEnvelope, LdpMessageBody};
 use crate::types::provenance::Provenance;
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::{debug, info, instrument};
+
+/// Validate a task result against its contract. Returns violation codes.
+fn validate_contract(
+    contract: &DelegationContract,
+    provenance: &Provenance,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+
+    // Deadline check (client's local UTC time is authoritative)
+    if let Some(ref deadline_str) = contract.deadline {
+        if let Ok(deadline) = chrono::DateTime::parse_from_rfc3339(deadline_str) {
+            if chrono::Utc::now() > deadline {
+                violations.push("deadline_exceeded".into());
+            }
+        }
+    }
+
+    // Budget token check
+    if let Some(ref budget) = contract.policy.budget {
+        if let (Some(max), Some(used)) = (budget.max_tokens, provenance.tokens_used) {
+            if used > max {
+                violations.push("budget_tokens_exceeded".into());
+            }
+        }
+        if let (Some(max), Some(used)) = (budget.max_cost_usd, provenance.cost_usd) {
+            if used > max {
+                violations.push("budget_cost_exceeded".into());
+            }
+        }
+    }
+
+    violations
+}
 
 /// LDP protocol adapter.
 ///
@@ -29,6 +66,7 @@ pub struct LdpAdapter {
     session_manager: SessionManager,
     client: LdpClient,
     config: LdpAdapterConfig,
+    contracts: Arc<RwLock<HashMap<String, DelegationContract>>>,
 }
 
 impl LdpAdapter {
@@ -40,6 +78,7 @@ impl LdpAdapter {
             session_manager,
             client,
             config,
+            contracts: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -50,6 +89,7 @@ impl LdpAdapter {
             session_manager,
             client,
             config,
+            contracts: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -99,6 +139,35 @@ impl LdpAdapter {
             }
         } else {
             output
+        }
+    }
+
+    /// Apply contract validation to a completed task, returning final TaskStatus.
+    fn apply_contract_validation(
+        &self,
+        contract: &DelegationContract,
+        output: Value,
+        mut provenance: Provenance,
+    ) -> TaskStatus {
+        let violations = validate_contract(contract, &provenance);
+
+        provenance.contract_id = Some(contract.contract_id.clone());
+        provenance.contract_satisfied = Some(violations.is_empty());
+        provenance.contract_violations = violations.clone();
+
+        let output = self.embed_provenance(output, provenance);
+
+        if !violations.is_empty() && contract.policy.failure_policy == FailurePolicy::FailClosed {
+            let summary = violations.join(", ");
+            TaskStatus::Failed {
+                error: LdpError::policy(
+                    "CONTRACT_VIOLATED",
+                    format!("Contract violations: {}", summary),
+                )
+                .with_partial_output(output),
+            }
+        } else {
+            TaskStatus::Completed { output }
         }
     }
 }
@@ -172,6 +241,12 @@ impl ProtocolAdapter for LdpAdapter {
 
         let _response = self.client.send_message(url, &submit).await?;
 
+        // Store contract for later validation.
+        if let Some(ref contract) = task.contract {
+            let mut contracts = self.contracts.write().await;
+            contracts.insert(task_id.clone(), contract.clone());
+        }
+
         // Touch session (update last_used, increment task count).
         self.session_manager.touch(url).await;
 
@@ -189,6 +264,9 @@ impl ProtocolAdapter for LdpAdapter {
     /// In a full implementation, this would use SSE or WebSocket.
     #[instrument(skip(self, task), fields(url = %url, skill = %task.skill))]
     async fn stream(&self, url: &str, task: TaskRequest) -> Result<TaskStream, String> {
+        // Capture the contract before invoke() consumes the task.
+        let contract = task.contract.clone();
+
         let handle = self.invoke(url, task).await?;
         let client = self.client.clone();
         let config = self.config.clone();
@@ -244,7 +322,25 @@ impl ProtocolAdapter for LdpAdapter {
                             } else {
                                 output
                             };
-                            yield TaskEvent::Completed { output: output_with_provenance };
+
+                            // Apply contract validation if present
+                            if let Some(ref contract) = contract {
+                                let violations = validate_contract(contract, &provenance);
+                                if !violations.is_empty() && contract.policy.failure_policy == FailurePolicy::FailClosed {
+                                    let summary = violations.join(", ");
+                                    yield TaskEvent::Failed {
+                                        error: LdpError::policy(
+                                            "CONTRACT_VIOLATED",
+                                            format!("Contract violations: {}", summary),
+                                        )
+                                        .with_partial_output(output_with_provenance),
+                                    };
+                                } else {
+                                    yield TaskEvent::Completed { output: output_with_provenance };
+                                }
+                            } else {
+                                yield TaskEvent::Completed { output: output_with_provenance };
+                            }
                             break;
                         }
                         LdpMessageBody::TaskFailed { error, .. } => {
@@ -298,8 +394,13 @@ impl ProtocolAdapter for LdpAdapter {
                 }
             }
             LdpMessageBody::TaskResult { output, provenance, .. } => {
-                let output = self.embed_provenance(output, provenance);
-                Ok(TaskStatus::Completed { output })
+                let contracts = self.contracts.read().await;
+                if let Some(contract) = contracts.get(task_id) {
+                    Ok(self.apply_contract_validation(contract, output, provenance))
+                } else {
+                    let output = self.embed_provenance(output, provenance);
+                    Ok(TaskStatus::Completed { output })
+                }
             }
             LdpMessageBody::TaskFailed { error, .. } => Ok(TaskStatus::Failed { error }),
             _ => Ok(TaskStatus::Working),

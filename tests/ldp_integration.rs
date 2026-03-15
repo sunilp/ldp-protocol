@@ -6,6 +6,7 @@
 use ldp_protocol::config::LdpAdapterConfig;
 use ldp_protocol::protocol::{ProtocolAdapter, TaskRequest, TaskStatus};
 use ldp_protocol::server::LdpServer;
+use ldp_protocol::types::contract::{DelegationContract, FailurePolicy};
 use ldp_protocol::types::messages::LdpEnvelope;
 use ldp_protocol::LdpAdapter;
 use serde_json::json;
@@ -546,5 +547,138 @@ async fn test_signed_invoke_has_provenance() {
             assert!(output.get("ldp_provenance").is_some() || output.get("echo").is_some());
         }
         _ => panic!("Expected Completed status"),
+    }
+}
+
+// --- Contract validation integration tests ---
+
+#[tokio::test]
+async fn test_contract_no_violations() {
+    let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server");
+    let base_url = start_test_server(server).await;
+
+    let adapter = LdpAdapter::new(LdpAdapterConfig {
+        delegate_id: "ldp:delegate:client".into(),
+        trust_domain: ldp_protocol::types::trust::TrustDomain::new("test-domain"),
+        enforce_trust_domains: false,
+        ..Default::default()
+    });
+
+    let contract = DelegationContract::new("Echo the input", vec!["return input".into()])
+        .with_deadline("2099-12-31T23:59:59Z");
+
+    let task = TaskRequest {
+        skill: "echo".into(),
+        input: json!({"data": "test"}),
+        contract: Some(contract),
+    };
+
+    let handle = adapter.invoke(&base_url, task).await.unwrap();
+    let status = adapter.status(&base_url, &handle.task_id).await.unwrap();
+
+    match status {
+        TaskStatus::Completed { output } => {
+            let prov = output.get("ldp_provenance").expect("provenance missing");
+            assert_eq!(prov.get("contract_satisfied").and_then(|v| v.as_bool()), Some(true));
+            let violations = prov.get("contract_violations").and_then(|v| v.as_array()).unwrap();
+            assert!(violations.is_empty());
+        }
+        other => panic!("Expected Completed, got: {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_contract_deadline_exceeded_fail_open() {
+    let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server");
+    let base_url = start_test_server(server).await;
+
+    let adapter = LdpAdapter::new(LdpAdapterConfig {
+        delegate_id: "ldp:delegate:client".into(),
+        trust_domain: ldp_protocol::types::trust::TrustDomain::new("test-domain"),
+        enforce_trust_domains: false,
+        ..Default::default()
+    });
+
+    let contract = DelegationContract::new("Echo", vec![])
+        .with_deadline("2020-01-01T00:00:00Z"); // Past deadline
+
+    let task = TaskRequest {
+        skill: "echo".into(),
+        input: json!({}),
+        contract: Some(contract),
+    };
+
+    let handle = adapter.invoke(&base_url, task).await.unwrap();
+    let status = adapter.status(&base_url, &handle.task_id).await.unwrap();
+
+    match status {
+        TaskStatus::Completed { output } => {
+            let prov = output.get("ldp_provenance").expect("provenance missing");
+            assert_eq!(prov.get("contract_satisfied").and_then(|v| v.as_bool()), Some(false));
+            let violations = prov.get("contract_violations").and_then(|v| v.as_array()).unwrap();
+            assert!(violations.iter().any(|v| v.as_str() == Some("deadline_exceeded")));
+        }
+        other => panic!("Expected Completed (FailOpen), got: {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_contract_deadline_fail_closed() {
+    let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server");
+    let base_url = start_test_server(server).await;
+
+    let adapter = LdpAdapter::new(LdpAdapterConfig {
+        delegate_id: "ldp:delegate:client".into(),
+        trust_domain: ldp_protocol::types::trust::TrustDomain::new("test-domain"),
+        enforce_trust_domains: false,
+        ..Default::default()
+    });
+
+    let contract = DelegationContract::new("Echo", vec![])
+        .with_deadline("2020-01-01T00:00:00Z")
+        .with_failure_policy(FailurePolicy::FailClosed);
+
+    let task = TaskRequest {
+        skill: "echo".into(),
+        input: json!({}),
+        contract: Some(contract),
+    };
+
+    let handle = adapter.invoke(&base_url, task).await.unwrap();
+    let status = adapter.status(&base_url, &handle.task_id).await.unwrap();
+
+    match status {
+        TaskStatus::Failed { error } => {
+            assert_eq!(error.code, "CONTRACT_VIOLATED");
+            assert!(error.partial_output.is_some(), "FailClosed should preserve output");
+        }
+        other => panic!("Expected Failed, got: {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_no_contract_backward_compatible() {
+    let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server");
+    let base_url = start_test_server(server).await;
+
+    let adapter = LdpAdapter::new(LdpAdapterConfig {
+        delegate_id: "ldp:delegate:client".into(),
+        trust_domain: ldp_protocol::types::trust::TrustDomain::new("test-domain"),
+        enforce_trust_domains: false,
+        ..Default::default()
+    });
+
+    let task = TaskRequest {
+        skill: "echo".into(),
+        input: json!({"data": "test"}),
+        contract: None,
+    };
+
+    let handle = adapter.invoke(&base_url, task).await.unwrap();
+    let status = adapter.status(&base_url, &handle.task_id).await.unwrap();
+
+    match status {
+        TaskStatus::Completed { .. } => {}
+        other => panic!("Expected Completed, got: {:?}", other),
     }
 }
