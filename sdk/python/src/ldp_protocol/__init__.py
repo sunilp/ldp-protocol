@@ -28,7 +28,7 @@ from ldp_protocol.types import (
     SessionState,
     TrustDomain,
 )
-from ldp_protocol.client import LdpClient
+from ldp_protocol.client import ContractViolationError, LdpClient
 from ldp_protocol.delegate import LdpDelegate
 from ldp_protocol.router import LdpRouter, RoutingStrategy
 from ldp_protocol.signing import sign_envelope, verify_envelope, apply_signature
@@ -58,6 +58,7 @@ __all__ = [
     "LdpMessageBody",
     "Provenance",
     # Client
+    "ContractViolationError",
     "LdpClient",
     # Delegate
     "LdpDelegate",

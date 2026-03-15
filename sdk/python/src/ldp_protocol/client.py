@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
 import httpx
 
+from ldp_protocol.types.contract import DelegationContract, FailurePolicy
 from ldp_protocol.types.error import LdpError
 from ldp_protocol.types.identity import LdpIdentityCard
 from ldp_protocol.types.messages import LdpEnvelope, LdpMessageBody
@@ -14,6 +16,41 @@ from ldp_protocol.types.payload import PayloadMode, negotiate_payload_mode
 from ldp_protocol.types.provenance import Provenance
 from ldp_protocol.types.session import LdpSession, SessionConfig, SessionState
 from ldp_protocol.types.trust import TrustDomain
+
+
+def _validate_contract(
+    contract: DelegationContract,
+    provenance: Provenance,
+) -> list[str]:
+    """Validate a result against a contract. Returns violation codes."""
+    violations: list[str] = []
+
+    if contract.deadline:
+        try:
+            deadline = datetime.fromisoformat(contract.deadline)
+            if datetime.now(timezone.utc) > deadline:
+                violations.append("deadline_exceeded")
+        except ValueError:
+            pass
+
+    if contract.policy.budget:
+        budget = contract.policy.budget
+        if budget.max_tokens is not None and provenance.tokens_used is not None:
+            if provenance.tokens_used > budget.max_tokens:
+                violations.append("budget_tokens_exceeded")
+        if budget.max_cost_usd is not None and provenance.cost_usd is not None:
+            if provenance.cost_usd > budget.max_cost_usd:
+                violations.append("budget_cost_exceeded")
+
+    return violations
+
+
+class ContractViolationError(RuntimeError):
+    """Raised when a delegation contract is violated with FailClosed policy."""
+
+    def __init__(self, message: str, result: dict):
+        super().__init__(message)
+        self.result = result
 
 
 class LdpClient:
@@ -195,6 +232,7 @@ class LdpClient:
         skill: str,
         input_data: Any,
         session: LdpSession | None = None,
+        contract: DelegationContract | None = None,
     ) -> dict[str, Any]:
         """Submit a task to a delegate and get the result.
 
@@ -203,9 +241,13 @@ class LdpClient:
             skill: Skill to invoke.
             input_data: Input data for the task.
             session: Optional existing session (auto-establishes if None).
+            contract: Optional delegation contract for bounded task execution.
 
         Returns:
             Dict with 'output' and 'provenance' keys.
+
+        Raises:
+            ContractViolationError: If contract is violated with FailClosed policy.
         """
         if session is None:
             session = await self.get_or_establish_session(url)
@@ -219,6 +261,7 @@ class LdpClient:
                 task_id=task_id,
                 skill=skill,
                 input=input_data,
+                contract=contract,
             ),
             payload_mode=session.payload.mode,
         )
@@ -228,7 +271,7 @@ class LdpClient:
         session.task_count += 1
 
         if response.body.type == "TASK_RESULT":
-            return {
+            result = {
                 "task_id": response.body.task_id,
                 "output": response.body.output,
                 "provenance": (
@@ -237,6 +280,21 @@ class LdpClient:
                     else None
                 ),
             }
+
+            # Contract validation
+            if contract and response.body.provenance:
+                violations = _validate_contract(contract, response.body.provenance)
+                result["contract_id"] = contract.contract_id
+                result["contract_satisfied"] = len(violations) == 0
+                result["contract_violations"] = violations
+
+                if violations and contract.policy.failure_policy == FailurePolicy.FAIL_CLOSED:
+                    raise ContractViolationError(
+                        f"Contract violated [{', '.join(violations)}]",
+                        result=result,
+                    )
+
+            return result
         elif response.body.type == "TASK_FAILED":
             error = response.body.error
             if isinstance(error, LdpError):

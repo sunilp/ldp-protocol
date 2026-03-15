@@ -372,6 +372,77 @@ class TestLdpError:
         assert body.error.code == "TRUST_VIOLATION"
 
 
+class TestContractValidation:
+    def test_no_violations(self):
+        from ldp_protocol.client import _validate_contract
+        contract = DelegationContract(
+            objective="test", success_criteria=[],
+            deadline="2099-12-31T23:59:59+00:00",
+        )
+        p = Provenance.create("d1", "v1")
+        violations = _validate_contract(contract, p)
+        assert violations == []
+
+    def test_deadline_exceeded(self):
+        from ldp_protocol.client import _validate_contract
+        contract = DelegationContract(
+            objective="test", success_criteria=[],
+            deadline="2020-01-01T00:00:00+00:00",
+        )
+        p = Provenance.create("d1", "v1")
+        violations = _validate_contract(contract, p)
+        assert "deadline_exceeded" in violations
+
+    def test_budget_tokens_exceeded(self):
+        from ldp_protocol.client import _validate_contract
+        contract = DelegationContract(
+            objective="test", success_criteria=[],
+            policy=PolicyEnvelope(budget=BudgetPolicy(max_tokens=1000)),
+        )
+        p = Provenance.create("d1", "v1", tokens_used=2000)
+        violations = _validate_contract(contract, p)
+        assert "budget_tokens_exceeded" in violations
+
+    def test_budget_cost_exceeded(self):
+        from ldp_protocol.client import _validate_contract
+        contract = DelegationContract(
+            objective="test", success_criteria=[],
+            policy=PolicyEnvelope(budget=BudgetPolicy(max_cost_usd=0.01)),
+        )
+        p = Provenance.create("d1", "v1", cost_usd=0.05)
+        violations = _validate_contract(contract, p)
+        assert "budget_cost_exceeded" in violations
+
+    def test_budget_skipped_when_no_usage(self):
+        from ldp_protocol.client import _validate_contract
+        contract = DelegationContract(
+            objective="test", success_criteria=[],
+            policy=PolicyEnvelope(budget=BudgetPolicy(max_tokens=100)),
+        )
+        p = Provenance.create("d1", "v1")
+        violations = _validate_contract(contract, p)
+        assert violations == []
+
+    def test_multiple_violations(self):
+        from ldp_protocol.client import _validate_contract
+        contract = DelegationContract(
+            objective="test", success_criteria=[],
+            deadline="2020-01-01T00:00:00+00:00",
+            policy=PolicyEnvelope(budget=BudgetPolicy(max_tokens=100)),
+        )
+        p = Provenance.create("d1", "v1", tokens_used=500)
+        violations = _validate_contract(contract, p)
+        assert "deadline_exceeded" in violations
+        assert "budget_tokens_exceeded" in violations
+
+    def test_no_budget_no_deadline_always_passes(self):
+        from ldp_protocol.client import _validate_contract
+        contract = DelegationContract(objective="draft", success_criteria=["be creative"])
+        p = Provenance.create("d1", "v1")
+        violations = _validate_contract(contract, p)
+        assert violations == []
+
+
 class TestSessionAdvanced:
     def test_session_expires_after_ttl(self):
         from datetime import datetime, timezone, timedelta
