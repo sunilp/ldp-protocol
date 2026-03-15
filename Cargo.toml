@@ -5,17 +5,16 @@ version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/sunilp/ldp-protocol"
+homepage = "https://ldp.sunilprakash.com"
+documentation = "https://docs.rs/ldp-protocol"
+readme = "README.md"
 keywords = ["llm", "agents", "protocol", "delegation", "multi-agent"]
 categories = ["network-programming", "web-programming"]
 
 [features]
 default = []
-jamjet = ["dep:jamjet-protocols"]
 
 [dependencies]
-# JamJet integration (optional — enable with `features = ["jamjet"]`)
-jamjet-protocols = { path = "../jamjet/runtime/protocols", optional = true }
-
 # Async runtime
 tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
