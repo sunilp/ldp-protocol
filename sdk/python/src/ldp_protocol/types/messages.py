@@ -8,6 +8,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
+from ldp_protocol.types.contract import DelegationContract
 from ldp_protocol.types.error import LdpError
 from ldp_protocol.types.payload import PayloadMode
 from ldp_protocol.types.provenance import Provenance
@@ -39,6 +40,8 @@ class LdpMessageBody(BaseModel):
     task_id: str | None = None
     skill: str | None = None
     input: Any | None = None
+    # TASK_SUBMIT — contract
+    contract: DelegationContract | None = None
 
     # TASK_UPDATE
     progress: float | None = None
@@ -80,8 +83,11 @@ class LdpMessageBody(BaseModel):
             return cls(type="SESSION_REJECT", reason=reason.message, error=reason)
 
     @classmethod
-    def task_submit(cls, task_id: str, skill: str, input: Any) -> LdpMessageBody:
-        return cls(type="TASK_SUBMIT", task_id=task_id, skill=skill, input=input)
+    def task_submit(
+        cls, task_id: str, skill: str, input: Any,
+        contract: DelegationContract | None = None,
+    ) -> LdpMessageBody:
+        return cls(type="TASK_SUBMIT", task_id=task_id, skill=skill, input=input, contract=contract)
 
     @classmethod
     def task_update(
