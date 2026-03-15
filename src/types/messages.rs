@@ -3,6 +3,7 @@
 //! The LDP message envelope wraps all protocol messages with routing,
 //! session context, and provenance metadata.
 
+use crate::types::error::LdpError;
 use crate::types::payload::PayloadMode;
 use crate::types::provenance::Provenance;
 use serde::{Deserialize, Serialize};
@@ -62,7 +63,11 @@ pub enum LdpMessageBody {
     },
 
     /// Reject a proposed session.
-    SessionReject { reason: String },
+    SessionReject {
+        reason: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<LdpError>,
+    },
 
     /// Submit a task within a session.
     TaskSubmit {
@@ -86,7 +91,7 @@ pub enum LdpMessageBody {
     },
 
     /// Task failure.
-    TaskFailed { task_id: String, error: String },
+    TaskFailed { task_id: String, error: LdpError },
 
     /// Task cancellation request.
     TaskCancel { task_id: String },

@@ -169,8 +169,12 @@ impl SessionManager {
                     task_count: 0,
                 })
             }
-            LdpMessageBody::SessionReject { reason } => {
-                Err(format!("Session rejected by remote: {}", reason))
+            LdpMessageBody::SessionReject { reason, error } => {
+                if let Some(err) = error {
+                    Err(format!("Session rejected: [{}] {}", err.code, err.message))
+                } else {
+                    Err(format!("Session rejected by remote: {}", reason))
+                }
             }
             other => Err(format!(
                 "Expected SESSION_ACCEPT/REJECT, got: {:?}",

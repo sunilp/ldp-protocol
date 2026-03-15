@@ -3,6 +3,7 @@
 //! These types define the adapter interface for LDP, allowing it to operate
 //! independently or as a plugin within runtimes like JamJet.
 
+use crate::types::error::LdpError;
 use async_trait::async_trait;
 use futures::Stream;
 use serde::{Deserialize, Serialize};
@@ -64,7 +65,7 @@ pub enum TaskEvent {
     /// Task completed successfully.
     Completed { output: Value },
     /// Task failed.
-    Failed { error: String },
+    Failed { error: LdpError },
 }
 
 /// Current status of a submitted task.
@@ -77,7 +78,7 @@ pub enum TaskStatus {
     /// Task completed with output.
     Completed { output: Value },
     /// Task failed with an error.
-    Failed { error: String },
+    Failed { error: LdpError },
 }
 
 /// Async stream of task events.

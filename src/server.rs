@@ -8,6 +8,7 @@
 //! - Dispatches tasks to a pluggable handler
 
 use crate::types::capability::LdpCapability;
+use crate::types::error::LdpError;
 use crate::types::identity::LdpIdentityCard;
 use crate::types::messages::{LdpEnvelope, LdpMessageBody};
 use crate::types::payload::{negotiate_payload_mode, PayloadMode};
@@ -190,15 +191,17 @@ impl LdpServer {
             .unwrap_or("unknown");
 
         if !self.identity.trust_domain.trusts(remote_domain) {
+            let reason = format!(
+                "Trust domain '{}' not trusted by '{}'",
+                remote_domain, self.identity.trust_domain.name
+            );
             return Ok(LdpEnvelope::new(
                 &session_id,
                 &self.identity.delegate_id,
                 &envelope.from,
                 LdpMessageBody::SessionReject {
-                    reason: format!(
-                        "Trust domain '{}' not trusted by '{}'",
-                        remote_domain, self.identity.trust_domain.name
-                    ),
+                    reason: reason.clone(),
+                    error: Some(LdpError::policy("TRUST_VIOLATION", reason)),
                 },
                 PayloadMode::Text,
             ));
@@ -330,7 +333,10 @@ impl LdpServer {
                 },
                 TaskRecordState::Failed => LdpMessageBody::TaskFailed {
                     task_id: task_id.to_string(),
-                    error: record.error.clone().unwrap_or("unknown error".into()),
+                    error: LdpError::runtime(
+                        "TASK_FAILED",
+                        record.error.clone().unwrap_or_else(|| "unknown error".into()),
+                    ),
                 },
                 _ => LdpMessageBody::TaskUpdate {
                     task_id: task_id.to_string(),
@@ -368,7 +374,7 @@ impl LdpServer {
             &envelope.from,
             LdpMessageBody::TaskFailed {
                 task_id: task_id.to_string(),
-                error: "cancelled".into(),
+                error: LdpError::runtime("CANCELLED", "Task cancelled by client"),
             },
             PayloadMode::Text,
         ))

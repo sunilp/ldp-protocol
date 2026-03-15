@@ -13,6 +13,7 @@ use crate::protocol::{
     TaskStatus, TaskStream,
 };
 use crate::session_manager::SessionManager;
+use crate::types::error::LdpError;
 use crate::types::messages::{LdpEnvelope, LdpMessageBody};
 use crate::types::provenance::Provenance;
 
@@ -242,7 +243,7 @@ impl ProtocolAdapter for LdpAdapter {
                         _ => {}
                     },
                     Err(e) => {
-                        yield TaskEvent::Failed { error: e };
+                        yield TaskEvent::Failed { error: LdpError::transport("STREAM_ERROR", e) };
                         break;
                     }
                 }
