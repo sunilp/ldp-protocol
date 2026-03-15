@@ -13,6 +13,7 @@ from ldp_protocol.types import (
     TrustDomain,
     negotiate_payload_mode,
 )
+from ldp_protocol.types.capability import ClaimType
 
 
 class TestPayloadMode:
@@ -206,3 +207,25 @@ class TestMessages:
         assert "from" in data  # alias works
         restored = LdpEnvelope.model_validate(data)
         assert restored.body.task_id == "t1"
+
+
+class TestClaimType:
+    def test_default_is_self_claimed(self):
+        metrics = QualityMetrics()
+        assert metrics.claim_type == ClaimType.SELF_CLAIMED
+
+    def test_serialization_roundtrip(self):
+        metrics = QualityMetrics(
+            quality_score=0.95,
+            claim_type=ClaimType.ISSUER_ATTESTED,
+        )
+        data = metrics.model_dump()
+        assert data["claim_type"] == "issuer_attested"
+        restored = QualityMetrics.model_validate(data)
+        assert restored.claim_type == ClaimType.ISSUER_ATTESTED
+
+    def test_all_claim_types(self):
+        assert ClaimType.SELF_CLAIMED
+        assert ClaimType.ISSUER_ATTESTED
+        assert ClaimType.RUNTIME_OBSERVED
+        assert ClaimType.EXTERNALLY_BENCHMARKED

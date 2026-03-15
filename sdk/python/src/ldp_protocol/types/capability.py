@@ -2,9 +2,19 @@
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field
+
+
+class ClaimType(str, Enum):
+    """How a quality claim was established."""
+
+    SELF_CLAIMED = "self_claimed"
+    ISSUER_ATTESTED = "issuer_attested"
+    RUNTIME_OBSERVED = "runtime_observed"
+    EXTERNALLY_BENCHMARKED = "externally_benchmarked"
 
 
 class QualityMetrics(BaseModel):
@@ -16,6 +26,7 @@ class QualityMetrics(BaseModel):
     cost_per_call_usd: float | None = None
     max_tokens: int | None = None
     supports_streaming: bool = False
+    claim_type: ClaimType = ClaimType.SELF_CLAIMED
 
 
 class LdpCapability(BaseModel):

@@ -7,6 +7,7 @@ and trust domains.
 """
 
 from ldp_protocol.types import (
+    ClaimType,
     LdpCapability,
     LdpEnvelope,
     LdpIdentityCard,
@@ -28,6 +29,7 @@ __version__ = "0.1.0"
 
 __all__ = [
     # Types
+    "ClaimType",
     "LdpIdentityCard",
     "LdpCapability",
     "QualityMetrics",

@@ -2,7 +2,7 @@
 
 from ldp_protocol.types.payload import NegotiatedPayload, PayloadMode, negotiate_payload_mode
 from ldp_protocol.types.trust import TrustDomain
-from ldp_protocol.types.capability import LdpCapability, QualityMetrics
+from ldp_protocol.types.capability import ClaimType, LdpCapability, QualityMetrics
 from ldp_protocol.types.identity import LdpIdentityCard
 from ldp_protocol.types.provenance import Provenance
 from ldp_protocol.types.session import LdpSession, SessionConfig, SessionState
@@ -13,6 +13,7 @@ __all__ = [
     "NegotiatedPayload",
     "negotiate_payload_mode",
     "TrustDomain",
+    "ClaimType",
     "LdpCapability",
     "QualityMetrics",
     "LdpIdentityCard",
