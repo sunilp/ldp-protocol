@@ -12,6 +12,7 @@ pub mod payload;
 pub mod provenance;
 pub mod session;
 pub mod trust;
+pub mod verification;
 
 pub use capability::{LdpCapability, QualityMetrics, ClaimType};
 pub use contract::{DelegationContract, PolicyEnvelope, FailurePolicy, BudgetPolicy};
@@ -22,3 +23,4 @@ pub use payload::PayloadMode;
 pub use provenance::Provenance;
 pub use session::{LdpSession, SessionConfig, SessionState};
 pub use trust::TrustDomain;
+pub use verification::{VerificationStatus, EvidenceRef, ProvenanceEntry};
