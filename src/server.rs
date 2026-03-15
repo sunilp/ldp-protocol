@@ -15,6 +15,7 @@ use crate::types::payload::{negotiate_payload_mode, PayloadMode};
 use crate::types::provenance::Provenance;
 use crate::types::session::{LdpSession, SessionState};
 use crate::types::trust::TrustDomain;
+use crate::types::verification::VerificationStatus;
 
 use chrono::Utc;
 use serde_json::{json, Value};
@@ -314,10 +315,15 @@ impl LdpServer {
         }
 
         // Build provenance.
-        let provenance = Provenance::new(
+        let mut provenance = Provenance::new(
             &self.identity.delegate_id,
             &self.identity.model_version,
         );
+        provenance.verification_status = VerificationStatus::SelfVerified;
+        #[allow(deprecated)]
+        {
+            provenance.verified = true;
+        }
 
         // Determine payload mode from session.
         let mode = {
@@ -351,13 +357,21 @@ impl LdpServer {
 
         if let Some(record) = tasks.get(task_id) {
             let body = match record.state {
-                TaskRecordState::Completed => LdpMessageBody::TaskResult {
-                    task_id: task_id.to_string(),
-                    output: record.output.clone().unwrap_or(json!(null)),
-                    provenance: Provenance::new(
+                TaskRecordState::Completed => {
+                    let mut provenance = Provenance::new(
                         &self.identity.delegate_id,
                         &self.identity.model_version,
-                    ),
+                    );
+                    provenance.verification_status = VerificationStatus::SelfVerified;
+                    #[allow(deprecated)]
+                    {
+                        provenance.verified = true;
+                    }
+                    LdpMessageBody::TaskResult {
+                        task_id: task_id.to_string(),
+                        output: record.output.clone().unwrap_or(json!(null)),
+                        provenance,
+                    }
                 },
                 TaskRecordState::Failed => LdpMessageBody::TaskFailed {
                     task_id: task_id.to_string(),
