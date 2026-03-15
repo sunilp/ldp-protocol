@@ -96,6 +96,7 @@ async fn handle_connection(stream: tokio::net::TcpStream, server: Arc<LdpServer>
 fn test_adapter() -> LdpAdapter {
     LdpAdapter::new(LdpAdapterConfig {
         delegate_id: "ldp:delegate:test-client".into(),
+        trust_domain: ldp_protocol::types::trust::TrustDomain::new("test-domain"),
         ..Default::default()
     })
 }
@@ -242,13 +243,10 @@ async fn test_trust_domain_mismatch_rejected() {
     let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server");
     let base_url = start_test_server(server).await;
 
-    // Adapter requires a different trust domain.
+    // Adapter in a different trust domain that doesn't trust "test-domain".
     let adapter = LdpAdapter::new(LdpAdapterConfig {
         delegate_id: "ldp:delegate:strict-client".into(),
-        session: ldp_protocol::types::session::SessionConfig {
-            required_trust_domain: Some("production-only".into()),
-            ..Default::default()
-        },
+        trust_domain: ldp_protocol::types::trust::TrustDomain::new("production-only"),
         enforce_trust_domains: true,
         ..Default::default()
     });
@@ -257,7 +255,98 @@ async fn test_trust_domain_mismatch_rejected() {
     let result = adapter.discover(&base_url).await;
     assert!(result.is_err());
     assert!(
-        result.unwrap_err().contains("Trust domain mismatch"),
+        result.unwrap_err().contains("not trusted"),
+        "Expected trust domain error"
+    );
+}
+
+#[tokio::test]
+async fn test_cross_domain_with_trusted_peer_succeeds() {
+    use ldp_protocol::types::trust::TrustDomain;
+
+    // Server in "partner" domain, trusts "acme".
+    let server = {
+        use ldp_protocol::types::identity::LdpIdentityCard;
+        use ldp_protocol::types::capability::LdpCapability;
+        use ldp_protocol::types::payload::PayloadMode;
+        use std::collections::HashMap;
+        use serde_json::json;
+
+        let identity = LdpIdentityCard {
+            delegate_id: "ldp:delegate:partner".to_string(),
+            name: "Partner Server".to_string(),
+            description: Some("Partner domain server".into()),
+            model_family: "TestModel".into(),
+            model_version: "1.0".into(),
+            weights_fingerprint: None,
+            trust_domain: TrustDomain {
+                name: "partner".into(),
+                allow_cross_domain: true,
+                trusted_peers: vec!["acme".into()],
+            },
+            context_window: 4096,
+            reasoning_profile: Some("analytical".into()),
+            cost_profile: Some("low".into()),
+            latency_profile: Some("p50:100ms".into()),
+            jurisdiction: None,
+            capabilities: vec![LdpCapability {
+                name: "echo".into(),
+                description: Some("Echoes input back".into()),
+                input_schema: None,
+                output_schema: None,
+                quality: None,
+                domains: vec![],
+            }],
+            supported_payload_modes: vec![PayloadMode::SemanticFrame, PayloadMode::Text],
+            endpoint: String::new(),
+            metadata: HashMap::new(),
+        };
+
+        let handler: ldp_protocol::server::TaskHandler = Arc::new(|_skill, input| {
+            json!({ "echo": input })
+        });
+
+        LdpServer::new(identity, handler)
+    };
+    let base_url = start_test_server(server).await;
+
+    // Adapter in "acme" domain, trusts "partner".
+    let adapter = LdpAdapter::new(LdpAdapterConfig {
+        delegate_id: "ldp:delegate:acme-client".into(),
+        trust_domain: TrustDomain {
+            name: "acme".into(),
+            allow_cross_domain: true,
+            trusted_peers: vec!["partner".into()],
+        },
+        enforce_trust_domains: true,
+        ..Default::default()
+    });
+
+    // Discovery should succeed because acme trusts partner.
+    let caps = adapter.discover(&base_url).await.unwrap();
+    assert_eq!(caps.name, "Partner Server");
+}
+
+#[tokio::test]
+async fn test_cross_domain_without_trust_fails() {
+    use ldp_protocol::types::trust::TrustDomain;
+
+    let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server");
+    let base_url = start_test_server(server).await;
+
+    // Adapter in "isolated" domain, trusts nobody.
+    let adapter = LdpAdapter::new(LdpAdapterConfig {
+        delegate_id: "ldp:delegate:isolated-client".into(),
+        trust_domain: TrustDomain::new("isolated"),
+        enforce_trust_domains: true,
+        ..Default::default()
+    });
+
+    // Discovery should fail because "isolated" doesn't trust "test-domain".
+    let result = adapter.discover(&base_url).await;
+    assert!(result.is_err());
+    assert!(
+        result.unwrap_err().contains("not trusted"),
         "Expected trust domain error"
     );
 }

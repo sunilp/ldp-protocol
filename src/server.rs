@@ -183,6 +183,27 @@ impl LdpServer {
         let session_id = envelope.session_id.clone();
         info!(session_id = %session_id, from = %envelope.from, "Session proposed");
 
+        // Validate trust domain
+        let remote_domain = config
+            .get("trust_domain")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+
+        if !self.identity.trust_domain.trusts(remote_domain) {
+            return Ok(LdpEnvelope::new(
+                &session_id,
+                &self.identity.delegate_id,
+                &envelope.from,
+                LdpMessageBody::SessionReject {
+                    reason: format!(
+                        "Trust domain '{}' not trusted by '{}'",
+                        remote_domain, self.identity.trust_domain.name
+                    ),
+                },
+                PayloadMode::Text,
+            ));
+        }
+
         // Extract requested payload mode (default to SemanticFrame).
         let requested_mode = config
             .get("payload_mode")

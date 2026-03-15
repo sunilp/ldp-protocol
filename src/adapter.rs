@@ -118,13 +118,11 @@ impl ProtocolAdapter for LdpAdapter {
 
         // Trust domain check.
         if self.config.enforce_trust_domains {
-            if let Some(ref required_domain) = self.config.session.required_trust_domain {
-                if identity.trust_domain.name != *required_domain {
-                    return Err(format!(
-                        "Trust domain mismatch: required {}, got {}",
-                        required_domain, identity.trust_domain.name
-                    ));
-                }
+            if !self.config.trust_domain.trusts(&identity.trust_domain.name) {
+                return Err(format!(
+                    "Trust domain '{}' is not trusted by '{}'",
+                    identity.trust_domain.name, self.config.trust_domain.name
+                ));
             }
         }
 

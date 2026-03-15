@@ -21,6 +21,7 @@ async fn main() {
     // 1. Create LDP adapter with custom config
     let config = LdpAdapterConfig {
         delegate_id: "ldp:delegate:my-orchestrator".into(),
+        trust_domain: ldp_protocol::types::trust::TrustDomain::default(),
         session: SessionConfig {
             preferred_payload_modes: vec![PayloadMode::SemanticFrame, PayloadMode::Text],
             ttl_secs: 3600,

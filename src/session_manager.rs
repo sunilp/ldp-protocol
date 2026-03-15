@@ -14,7 +14,6 @@ use crate::config::LdpAdapterConfig;
 use crate::types::messages::{LdpEnvelope, LdpMessageBody};
 use crate::types::payload::{negotiate_payload_mode, PayloadMode};
 use crate::types::session::{LdpSession, SessionState};
-use crate::types::trust::TrustDomain;
 use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -126,23 +125,7 @@ impl SessionManager {
             "Payload mode negotiated"
         );
 
-        // Step 4: Trust domain check
-        let remote_trust_domain = hello_response
-            .provenance
-            .as_ref()
-            .map(|p| p.produced_by.clone())
-            .unwrap_or_default();
-
-        if let Some(ref required_domain) = session_config.required_trust_domain {
-            if remote_trust_domain != *required_domain && !remote_trust_domain.is_empty() {
-                return Err(format!(
-                    "Trust domain mismatch: required {}, got {}",
-                    required_domain, remote_trust_domain
-                ));
-            }
-        }
-
-        // Step 5: Send SESSION_PROPOSE
+        // Step 4: Send SESSION_PROPOSE (trust is enforced in discover())
         let session_id = uuid::Uuid::new_v4().to_string();
         let propose = LdpEnvelope::new(
             &session_id,
@@ -152,6 +135,7 @@ impl SessionManager {
                 config: serde_json::json!({
                     "payload_mode": negotiated.mode,
                     "ttl_secs": session_config.ttl_secs,
+                    "trust_domain": self.config.trust_domain.name,
                 }),
             },
             PayloadMode::Text,
@@ -178,7 +162,7 @@ impl SessionManager {
                     remote_delegate_id,
                     state: SessionState::Active,
                     payload: negotiated,
-                    trust_domain: TrustDomain::new(remote_trust_domain),
+                    trust_domain: self.config.trust_domain.clone(),
                     created_at: now,
                     last_used: now,
                     ttl_secs: session_config.ttl_secs,
