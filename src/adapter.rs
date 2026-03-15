@@ -17,6 +17,7 @@ use crate::types::contract::{DelegationContract, FailurePolicy};
 use crate::types::error::LdpError;
 use crate::types::messages::{LdpEnvelope, LdpMessageBody};
 use crate::types::provenance::Provenance;
+use crate::types::verification::ProvenanceEntry;
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -56,6 +57,17 @@ fn validate_contract(
     }
 
     violations
+}
+
+/// Build a lineage entry from a provenance record and the skill name.
+fn build_lineage_entry(provenance: &Provenance, skill: &str) -> ProvenanceEntry {
+    ProvenanceEntry {
+        delegate_id: provenance.produced_by.clone(),
+        model_version: provenance.model_version.clone(),
+        step: skill.to_string(),
+        timestamp: provenance.timestamp.clone(),
+        verification_status: provenance.verification_status.clone(),
+    }
 }
 
 /// LDP protocol adapter.
@@ -306,7 +318,9 @@ impl ProtocolAdapter for LdpAdapter {
                                 progress,
                             };
                         }
-                        LdpMessageBody::TaskResult { output, provenance, .. } => {
+                        LdpMessageBody::TaskResult { output, mut provenance, .. } => {
+                            provenance.lineage.insert(0, build_lineage_entry(&provenance, "task"));
+                            provenance.normalize();
                             let output_with_provenance = if config.attach_provenance {
                                 match output {
                                     Value::Object(mut map) => {
@@ -393,7 +407,9 @@ impl ProtocolAdapter for LdpAdapter {
                     Ok(TaskStatus::Working)
                 }
             }
-            LdpMessageBody::TaskResult { output, provenance, .. } => {
+            LdpMessageBody::TaskResult { output, mut provenance, .. } => {
+                provenance.lineage.insert(0, build_lineage_entry(&provenance, "task"));
+                provenance.normalize();
                 let contracts = self.contracts.read().await;
                 if let Some(contract) = contracts.get(task_id) {
                     Ok(self.apply_contract_validation(contract, output, provenance))

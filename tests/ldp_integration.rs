@@ -682,3 +682,75 @@ async fn test_no_contract_backward_compatible() {
         other => panic!("Expected Completed, got: {:?}", other),
     }
 }
+
+#[tokio::test]
+async fn test_result_has_lineage_entry() {
+    let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server");
+    let base_url = start_test_server(server).await;
+
+    let adapter = LdpAdapter::new(LdpAdapterConfig {
+        delegate_id: "ldp:delegate:client".into(),
+        trust_domain: ldp_protocol::types::trust::TrustDomain::new("test-domain"),
+        enforce_trust_domains: false,
+        ..Default::default()
+    });
+
+    let task = TaskRequest {
+        skill: "echo".into(),
+        input: json!({"data": "lineage-test"}),
+        contract: None,
+    };
+
+    let handle = adapter.invoke(&base_url, task).await.unwrap();
+    let status = adapter.status(&base_url, &handle.task_id).await.unwrap();
+
+    match status {
+        TaskStatus::Completed { output } => {
+            let prov = output.get("ldp_provenance").expect("provenance missing");
+            let lineage = prov.get("lineage").and_then(|v| v.as_array()).unwrap();
+            assert_eq!(lineage.len(), 1);
+            assert_eq!(
+                lineage[0].get("delegate_id").and_then(|v| v.as_str()),
+                Some("ldp:delegate:echo")
+            );
+            assert_eq!(
+                lineage[0].get("verification_status").and_then(|v| v.as_str()),
+                Some("self_verified")
+            );
+        }
+        other => panic!("Expected Completed, got: {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_result_has_verification_status() {
+    let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server");
+    let base_url = start_test_server(server).await;
+
+    let adapter = LdpAdapter::new(LdpAdapterConfig {
+        delegate_id: "ldp:delegate:client".into(),
+        trust_domain: ldp_protocol::types::trust::TrustDomain::new("test-domain"),
+        enforce_trust_domains: false,
+        ..Default::default()
+    });
+
+    let task = TaskRequest {
+        skill: "echo".into(),
+        input: json!({"data": "verification-test"}),
+        contract: None,
+    };
+
+    let handle = adapter.invoke(&base_url, task).await.unwrap();
+    let status = adapter.status(&base_url, &handle.task_id).await.unwrap();
+
+    match status {
+        TaskStatus::Completed { output } => {
+            let prov = output.get("ldp_provenance").expect("provenance missing");
+            assert_eq!(
+                prov.get("verification_status").and_then(|v| v.as_str()),
+                Some("self_verified")
+            );
+        }
+        other => panic!("Expected Completed, got: {:?}", other),
+    }
+}
