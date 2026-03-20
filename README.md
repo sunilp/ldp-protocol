@@ -4,7 +4,7 @@ An identity-aware communication protocol for multi-agent LLM systems.
 
 LDP extends service-oriented agent protocols (like [A2A](https://github.com/a2aproject/A2A) and [MCP](https://modelcontextprotocol.io/)) with AI-native primitives: rich delegate identity, progressive payload modes, governed sessions, structured provenance, and trust domains.
 
-**Install:** `pip install ldp-protocol` · **Website:** [ldp.sunilprakash.com](https://ldp.sunilprakash.com) · **Paper:** [arXiv:2603.08852](https://arxiv.org/abs/2603.08852) · [PDF](https://arxiv.org/pdf/2603.08852)
+**Install:** `pip install ldp-protocol` · **Website:** [ldp.sunilprakash.com](https://ldp.sunilprakash.com) · **Papers:** [arXiv:2603.08852](https://arxiv.org/abs/2603.08852) · [arXiv:2603.18043](https://arxiv.org/abs/2603.18043) (Provenance Paradox)
 
 ## Why LDP?
 
@@ -349,7 +349,8 @@ ldp-protocol/
 - **[Protocol Specification (RFC)](docs/RFC.md)** — Formal protocol specification
 - **[Python SDK](sdk/python/)** — Python package documentation
 - **[Design Document](docs/DESIGN.md)** — Architecture and integration docs
-- **[Research Paper](https://arxiv.org/abs/2603.08852)** — arXiv:2603.08852
+- **[Research Paper](https://arxiv.org/abs/2603.08852)** — arXiv:2603.08852 (identity-aware routing)
+- **[Provenance Paradox Paper](https://arxiv.org/abs/2603.18043)** — arXiv:2603.18043 (delegation contracts, attested identity)
 - **[Experiment Code](https://github.com/sunilp/ldp-research)** — Reproduce the empirical evaluation
 
 ## Research
@@ -375,6 +376,14 @@ LDP is backed by empirical research comparing it against A2A and random baseline
          for Multi-Agent LLM Systems},
   author={Prakash, Sunil},
   journal={arXiv preprint arXiv:2603.08852},
+  year={2026}
+}
+
+@article{prakash2026provenance,
+  title={The Provenance Paradox in Multi-Agent LLM Routing:
+         Delegation Contracts and Attested Identity in LDP},
+  author={Prakash, Sunil},
+  journal={arXiv preprint arXiv:2603.18043},
   year={2026}
 }
 ```
