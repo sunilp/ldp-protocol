@@ -16,6 +16,7 @@ class FailureCategory(str, Enum):
     QUALITY = "quality"
     SESSION = "session"
     TRANSPORT = "transport"
+    SECURITY = "security"
 
 
 class ErrorSeverity(str, Enum):
@@ -100,4 +101,14 @@ class LdpError(BaseModel):
             message=message,
             severity=ErrorSeverity.WARNING,
             retryable=True,
+        )
+
+    @classmethod
+    def security(cls, code: str, message: str) -> LdpError:
+        return cls(
+            code=code,
+            category=FailureCategory.SECURITY,
+            message=message,
+            severity=ErrorSeverity.FATAL,
+            retryable=False,
         )

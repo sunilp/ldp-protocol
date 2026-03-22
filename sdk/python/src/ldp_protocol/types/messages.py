@@ -129,6 +129,7 @@ class LdpEnvelope(BaseModel):
     provenance: Provenance | None = None
     signature: str | None = None
     signature_algorithm: str | None = None
+    nonce: str | None = None
 
     model_config = {"populate_by_name": True}
 

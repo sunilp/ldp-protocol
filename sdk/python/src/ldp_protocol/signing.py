@@ -21,6 +21,10 @@ def sign_envelope(envelope: LdpEnvelope, secret: str) -> str:
     mac.update(envelope.timestamp.encode())
     mac.update(b"|")
     mac.update(envelope.message_id.encode())
+    # Include nonce in signing payload only when present (backward compat)
+    if envelope.nonce is not None:
+        mac.update(b"|")
+        mac.update(envelope.nonce.encode())
     mac.update(b"|")
 
     body = envelope.body
