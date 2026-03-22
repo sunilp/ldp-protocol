@@ -44,6 +44,10 @@ pub struct LdpEnvelope {
     /// Signature algorithm (e.g., "hmac-sha256").
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature_algorithm: Option<String>,
+
+    /// Replay-prevention nonce (16-byte hex). Required when signing is enabled.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
 }
 
 /// LDP message body variants.
@@ -134,6 +138,7 @@ impl LdpEnvelope {
             provenance: None,
             signature: None,
             signature_algorithm: None,
+            nonce: None,
         }
     }
 }

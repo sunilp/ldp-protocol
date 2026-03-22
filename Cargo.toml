@@ -47,5 +47,8 @@ hmac = "0.12"
 hex = "0.4"
 subtle = "2"
 
+# Replay detection
+lru = "0.12"
+
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

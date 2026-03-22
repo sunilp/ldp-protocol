@@ -41,6 +41,7 @@ pub mod protocol;
 pub mod server;
 pub mod session_manager;
 pub mod signing;
+pub mod replay;
 pub mod types;
 
 pub use adapter::LdpAdapter;

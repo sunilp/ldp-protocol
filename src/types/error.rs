@@ -14,6 +14,7 @@ pub enum FailureCategory {
     Quality,
     Session,
     Transport,
+    Security,
 }
 
 /// Severity level of a failure.
@@ -115,6 +116,17 @@ impl LdpError {
         }
     }
 
+    pub fn security(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            code: code.into(),
+            category: FailureCategory::Security,
+            message: message.into(),
+            severity: ErrorSeverity::Fatal,
+            retryable: false,
+            partial_output: None,
+        }
+    }
+
     pub fn with_partial_output(mut self, output: Value) -> Self {
         self.partial_output = Some(output);
         self
@@ -164,6 +176,14 @@ mod tests {
         let err = LdpError::policy("TRUST_VIOLATION", "Not allowed");
         assert_eq!(err.severity, ErrorSeverity::Fatal);
         assert!(!err.retryable);
+    }
+
+    #[test]
+    fn security_failure() {
+        let err = LdpError::security("REPLAY_DETECTED", "Duplicate nonce");
+        assert_eq!(err.category, FailureCategory::Security);
+        assert!(!err.retryable);
+        assert_eq!(err.severity, ErrorSeverity::Fatal);
     }
 
     #[test]

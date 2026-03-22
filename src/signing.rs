@@ -25,6 +25,13 @@ pub fn sign_envelope(envelope: &LdpEnvelope, secret: &str) -> String {
     mac.update(envelope.timestamp.as_bytes());
     mac.update(b"|");
     mac.update(envelope.message_id.as_bytes());
+
+    // Include nonce in signing payload only when present (backward compat)
+    if let Some(ref nonce) = envelope.nonce {
+        mac.update(b"|");
+        mac.update(nonce.as_bytes());
+    }
+
     mac.update(b"|");
 
     // Sign body type and key identifying fields
