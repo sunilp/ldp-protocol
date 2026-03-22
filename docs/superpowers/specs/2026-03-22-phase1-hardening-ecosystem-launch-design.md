@@ -121,8 +121,12 @@ On message receive:
 | Python ReplayGuard | `sdk/python/src/ldp_protocol/replay.py` (new) | Same logic |
 | Python delegate | `delegate.py` | Call ReplayGuard in `handle_message()` |
 | Python signing | `signing.py` | Include nonce in canonical payload when non-null |
+| Rust error types | `src/types/error.rs` | Add `FailureCategory::Security` variant |
+| Python error types | `types/error.py` | Add `Security` to FailureCategory enum |
 
 **Backward compatibility:** If nonce is `None` and signing is disabled, replay detection is skipped. If nonce is `None` and signing is enabled, signature verification still works (nonce omitted from canonical payload), but replay detection is skipped for that message. This preserves full backward compatibility with v0.2.0 clients.
+
+**Note on TASK_UPDATE signing:** The extended TASK_UPDATE signing payload (including `progress` and `message`) is NOT backward-compatible with v0.2.0 signed TASK_UPDATE messages. This is acceptable because TASK_UPDATE is rare in v0.2.0 flows (no streaming endpoint) and primarily used for the new SSE streaming feature.
 
 **Tests:**
 
