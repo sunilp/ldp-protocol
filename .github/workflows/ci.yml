@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  rust-check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain: [stable, nightly]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+          components: rustfmt, clippy
+      - run: cargo fmt --check
+      - run: cargo clippy -- -D warnings
+      - run: cargo test
+
+  python-check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: |
+          cd sdk/python
+          pip install -e ".[dev]"
+          ruff check src/ tests/
+          ruff format --check src/ tests/
+          pytest -v
+
+  version-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Cargo.toml and pyproject.toml versions match
+        run: |
+          CARGO_VER=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          PY_VER=$(grep '^version' sdk/python/pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          if [ "$CARGO_VER" != "$PY_VER" ]; then
+            echo "Version mismatch: Cargo.toml=$CARGO_VER pyproject.toml=$PY_VER"
+            exit 1
+          fi
+
+  cross-sdk-compat:
+    runs-on: ubuntu-latest
+    needs: [rust-check, python-check]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: cargo build
+      - run: |
+          cd sdk/python
+          pip install -e ".[dev]"
+          pytest tests/ -v -k "cross_sdk or compat"
