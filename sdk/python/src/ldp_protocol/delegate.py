@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 from uuid import uuid4
 
-from ldp_protocol.types.capability import LdpCapability, QualityMetrics
+from ldp_protocol.types.capability import LdpCapability
 from ldp_protocol.types.error import LdpError
 from ldp_protocol.types.identity import LdpIdentityCard
 from ldp_protocol.types.messages import LdpEnvelope, LdpMessageBody

@@ -12,7 +12,7 @@ from ldp_protocol.types.contract import DelegationContract, FailurePolicy
 from ldp_protocol.types.error import LdpError
 from ldp_protocol.types.identity import LdpIdentityCard
 from ldp_protocol.types.messages import LdpEnvelope, LdpMessageBody
-from ldp_protocol.types.payload import PayloadMode, negotiate_payload_mode
+from ldp_protocol.types.payload import PayloadMode
 from ldp_protocol.types.provenance import Provenance
 from ldp_protocol.types.session import LdpSession, SessionConfig, SessionState
 from ldp_protocol.types.trust import TrustDomain
@@ -171,7 +171,7 @@ class LdpClient:
                 supported_modes=self.config.preferred_payload_modes,
             ),
         )
-        hello_resp = await self.send_message(url, hello)
+        await self.send_message(url, hello)
 
         # Step 2: SESSION_PROPOSE
         session_id = str(uuid4())

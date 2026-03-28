@@ -131,8 +131,8 @@ class LdpRouter:
             def balanced_score(d: LdpIdentityCard) -> float:
                 q = d.quality_score(skill)
                 c = d.cost(skill)
-                l = d.latency(skill)
-                return q / (c * l + 1e-9)
+                lat = d.latency(skill)
+                return q / (c * lat + 1e-9)
             candidates.sort(key=balanced_score, reverse=True)
 
         return candidates[0]

@@ -5,7 +5,6 @@ from ldp_protocol.types import (
     LdpEnvelope,
     LdpIdentityCard,
     LdpMessageBody,
-    NegotiatedPayload,
     PayloadMode,
     Provenance,
     QualityMetrics,
@@ -446,7 +445,7 @@ class TestContractValidation:
 class TestSessionAdvanced:
     def test_session_expires_after_ttl(self):
         from datetime import datetime, timezone, timedelta
-        from ldp_protocol.types.session import LdpSession, SessionState
+        from ldp_protocol.types.session import LdpSession
         session = LdpSession(
             session_id="s1", remote_url="http://localhost",
             remote_delegate_id="remote", trust_domain=TrustDomain(name="test"),
