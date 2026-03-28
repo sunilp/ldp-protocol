@@ -84,7 +84,10 @@ class LdpMessageBody(BaseModel):
 
     @classmethod
     def task_submit(
-        cls, task_id: str, skill: str, input: Any,
+        cls,
+        task_id: str,
+        skill: str,
+        input: Any,
         contract: DelegationContract | None = None,
     ) -> LdpMessageBody:
         return cls(type="TASK_SUBMIT", task_id=task_id, skill=skill, input=input, contract=contract)
@@ -123,9 +126,7 @@ class LdpEnvelope(BaseModel):
     to: str = ""
     body: LdpMessageBody
     payload_mode: PayloadMode = PayloadMode.TEXT
-    timestamp: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     provenance: Provenance | None = None
     signature: str | None = None
     signature_algorithm: str | None = None

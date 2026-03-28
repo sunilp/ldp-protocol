@@ -128,11 +128,13 @@ class LdpRouter:
         elif strategy == RoutingStrategy.LATENCY:
             candidates.sort(key=lambda d: d.latency(skill))
         elif strategy == RoutingStrategy.BALANCED:
+
             def balanced_score(d: LdpIdentityCard) -> float:
                 q = d.quality_score(skill)
                 c = d.cost(skill)
                 lat = d.latency(skill)
                 return q / (c * lat + 1e-9)
+
             candidates.sort(key=balanced_score, reverse=True)
 
         return candidates[0]
@@ -188,18 +190,20 @@ class LdpRouter:
         for url, identity in self.delegates.items():
             if skill and identity.capability(skill) is None:
                 continue
-            result.append({
-                "delegate_id": identity.delegate_id,
-                "name": identity.name,
-                "model_family": identity.model_family,
-                "model_version": identity.model_version,
-                "endpoint": url,
-                "trust_domain": identity.trust_domain.name,
-                "capabilities": [c.name for c in identity.capabilities],
-                "quality_scores": {
-                    c.name: c.quality.quality_score
-                    for c in identity.capabilities
-                    if c.quality and c.quality.quality_score is not None
-                },
-            })
+            result.append(
+                {
+                    "delegate_id": identity.delegate_id,
+                    "name": identity.name,
+                    "model_family": identity.model_family,
+                    "model_version": identity.model_version,
+                    "endpoint": url,
+                    "trust_domain": identity.trust_domain.name,
+                    "capabilities": [c.name for c in identity.capabilities],
+                    "quality_scores": {
+                        c.name: c.quality.quality_score
+                        for c in identity.capabilities
+                        if c.quality and c.quality.quality_score is not None
+                    },
+                }
+            )
         return result

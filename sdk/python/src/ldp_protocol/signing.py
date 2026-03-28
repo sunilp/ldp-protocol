@@ -1,4 +1,5 @@
 """HMAC message signing and verification for LDP envelopes."""
+
 from __future__ import annotations
 
 import hashlib

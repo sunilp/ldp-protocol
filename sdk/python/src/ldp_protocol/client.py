@@ -146,6 +146,7 @@ class LdpClient:
         """Send an LDP message and receive a response."""
         if self.signing_secret:
             from ldp_protocol.signing import apply_signature
+
             apply_signature(envelope, self.signing_secret)
         endpoint = f"{url.rstrip('/')}/ldp/messages"
         resp = await self._http.post(
@@ -194,12 +195,8 @@ class LdpClient:
         if propose_resp.body.type == "SESSION_REJECT":
             error = propose_resp.body.error
             if isinstance(error, LdpError):
-                raise ConnectionError(
-                    f"Session rejected [{error.code}]: {error.message}"
-                )
-            raise ConnectionError(
-                f"Session rejected: {propose_resp.body.reason}"
-            )
+                raise ConnectionError(f"Session rejected [{error.code}]: {error.message}")
+            raise ConnectionError(f"Session rejected: {propose_resp.body.reason}")
 
         # Build session from response
         negotiated_mode = propose_resp.body.negotiated_mode or PayloadMode.TEXT
@@ -275,9 +272,7 @@ class LdpClient:
                 "task_id": response.body.task_id,
                 "output": response.body.output,
                 "provenance": (
-                    response.body.provenance.model_dump()
-                    if response.body.provenance
-                    else None
+                    response.body.provenance.model_dump() if response.body.provenance else None
                 ),
             }
 

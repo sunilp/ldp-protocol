@@ -78,9 +78,7 @@ class LdpDelegate(ABC):
         )
 
     @abstractmethod
-    async def handle_task(
-        self, skill: str, input_data: Any, task_id: str
-    ) -> tuple[Any, float]:
+    async def handle_task(self, skill: str, input_data: Any, task_id: str) -> tuple[Any, float]:
         """Handle a task and return (output, confidence).
 
         Args:
@@ -98,6 +96,7 @@ class LdpDelegate(ABC):
         # Verify signature if signing is configured
         if self.signing_secret:
             from ldp_protocol.signing import verify_envelope as verify_sig, apply_signature
+
             if envelope.signature:
                 if not verify_sig(envelope, self.signing_secret, envelope.signature):
                     return LdpEnvelope.create(
@@ -136,13 +135,18 @@ class LdpDelegate(ABC):
         # Sign outgoing response
         if self.signing_secret:
             from ldp_protocol.signing import apply_signature
+
             apply_signature(response, self.signing_secret)
 
         return response
 
     def _handle_hello(self, envelope: LdpEnvelope) -> LdpEnvelope:
         caps = [
-            {"name": c.name, "description": c.description, "quality": c.quality.model_dump() if c.quality else None}
+            {
+                "name": c.name,
+                "description": c.description,
+                "quality": c.quality.model_dump() if c.quality else None,
+            }
             for c in self.identity.capabilities
         ]
         return LdpEnvelope.create(
@@ -175,9 +179,7 @@ class LdpDelegate(ABC):
             initiator_modes = [
                 PayloadMode(m) for m in envelope.body.config["preferred_payload_modes"]
             ]
-        negotiated = negotiate_payload_mode(
-            initiator_modes, self.identity.supported_payload_modes
-        )
+        negotiated = negotiate_payload_mode(initiator_modes, self.identity.supported_payload_modes)
 
         return LdpEnvelope.create(
             session_id=session_id,

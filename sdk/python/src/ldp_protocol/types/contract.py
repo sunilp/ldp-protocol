@@ -1,4 +1,5 @@
 """LDP delegation contract types."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -31,6 +32,4 @@ class DelegationContract(BaseModel):
     success_criteria: list[str] = Field(default_factory=list)
     policy: PolicyEnvelope = Field(default_factory=PolicyEnvelope)
     deadline: str | None = None
-    created_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())

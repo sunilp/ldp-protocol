@@ -1,4 +1,5 @@
 """Replay detection for LDP messages."""
+
 from __future__ import annotations
 
 from collections import OrderedDict
@@ -13,9 +14,7 @@ class ReplayGuard:
         self._capacity = capacity
         self._window_secs = window_secs
 
-    def check(
-        self, message_id: str, nonce: str | None, timestamp: str
-    ) -> str | None:
+    def check(self, message_id: str, nonce: str | None, timestamp: str) -> str | None:
         """Check if a message should be accepted. Returns error string if rejected, None if OK."""
         # 1. Timestamp freshness
         try:

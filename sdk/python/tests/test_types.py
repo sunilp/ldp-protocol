@@ -94,6 +94,7 @@ class TestTrustDomain:
 
     def test_empty_trust_domain_name_rejected(self):
         import pytest
+
         with pytest.raises(Exception):
             TrustDomain(name="")
 
@@ -232,7 +233,10 @@ class TestClaimType:
 
 
 from ldp_protocol.types.contract import (
-    DelegationContract, PolicyEnvelope, FailurePolicy, BudgetPolicy,
+    DelegationContract,
+    PolicyEnvelope,
+    FailurePolicy,
+    BudgetPolicy,
 )
 
 
@@ -245,7 +249,8 @@ class TestDelegationContract:
 
     def test_contract_with_budget(self):
         c = DelegationContract(
-            objective="task", success_criteria=[],
+            objective="task",
+            success_criteria=[],
             policy=PolicyEnvelope(budget=BudgetPolicy(max_tokens=5000, max_cost_usd=0.05)),
         )
         assert c.policy.budget.max_tokens == 5000
@@ -256,7 +261,8 @@ class TestDelegationContract:
 
     def test_serialization_roundtrip(self):
         c = DelegationContract(
-            objective="Analyze", success_criteria=["accuracy > 0.9"],
+            objective="Analyze",
+            success_criteria=["accuracy > 0.9"],
             policy=PolicyEnvelope(
                 failure_policy=FailurePolicy.FAIL_CLOSED,
                 budget=BudgetPolicy(max_tokens=10000),
@@ -296,8 +302,10 @@ class TestProvenanceContract:
 
     def test_provenance_backward_compat(self):
         old_data = {
-            "produced_by": "d1", "model_version": "v1",
-            "payload_mode_used": "text", "verified": False,
+            "produced_by": "d1",
+            "model_version": "v1",
+            "payload_mode_used": "text",
+            "verified": False,
         }
         p = Provenance.model_validate(old_data)
         assert p.produced_by == "d1"
@@ -374,8 +382,10 @@ class TestLdpError:
 class TestContractValidation:
     def test_no_violations(self):
         from ldp_protocol.client import _validate_contract
+
         contract = DelegationContract(
-            objective="test", success_criteria=[],
+            objective="test",
+            success_criteria=[],
             deadline="2099-12-31T23:59:59+00:00",
         )
         p = Provenance.create("d1", "v1")
@@ -384,8 +394,10 @@ class TestContractValidation:
 
     def test_deadline_exceeded(self):
         from ldp_protocol.client import _validate_contract
+
         contract = DelegationContract(
-            objective="test", success_criteria=[],
+            objective="test",
+            success_criteria=[],
             deadline="2020-01-01T00:00:00+00:00",
         )
         p = Provenance.create("d1", "v1")
@@ -394,8 +406,10 @@ class TestContractValidation:
 
     def test_budget_tokens_exceeded(self):
         from ldp_protocol.client import _validate_contract
+
         contract = DelegationContract(
-            objective="test", success_criteria=[],
+            objective="test",
+            success_criteria=[],
             policy=PolicyEnvelope(budget=BudgetPolicy(max_tokens=1000)),
         )
         p = Provenance.create("d1", "v1", tokens_used=2000)
@@ -404,8 +418,10 @@ class TestContractValidation:
 
     def test_budget_cost_exceeded(self):
         from ldp_protocol.client import _validate_contract
+
         contract = DelegationContract(
-            objective="test", success_criteria=[],
+            objective="test",
+            success_criteria=[],
             policy=PolicyEnvelope(budget=BudgetPolicy(max_cost_usd=0.01)),
         )
         p = Provenance.create("d1", "v1", cost_usd=0.05)
@@ -414,8 +430,10 @@ class TestContractValidation:
 
     def test_budget_skipped_when_no_usage(self):
         from ldp_protocol.client import _validate_contract
+
         contract = DelegationContract(
-            objective="test", success_criteria=[],
+            objective="test",
+            success_criteria=[],
             policy=PolicyEnvelope(budget=BudgetPolicy(max_tokens=100)),
         )
         p = Provenance.create("d1", "v1")
@@ -424,8 +442,10 @@ class TestContractValidation:
 
     def test_multiple_violations(self):
         from ldp_protocol.client import _validate_contract
+
         contract = DelegationContract(
-            objective="test", success_criteria=[],
+            objective="test",
+            success_criteria=[],
             deadline="2020-01-01T00:00:00+00:00",
             policy=PolicyEnvelope(budget=BudgetPolicy(max_tokens=100)),
         )
@@ -436,6 +456,7 @@ class TestContractValidation:
 
     def test_no_budget_no_deadline_always_passes(self):
         from ldp_protocol.client import _validate_contract
+
         contract = DelegationContract(objective="draft", success_criteria=["be creative"])
         p = Provenance.create("d1", "v1")
         violations = _validate_contract(contract, p)
@@ -446,9 +467,12 @@ class TestSessionAdvanced:
     def test_session_expires_after_ttl(self):
         from datetime import datetime, timezone, timedelta
         from ldp_protocol.types.session import LdpSession
+
         session = LdpSession(
-            session_id="s1", remote_url="http://localhost",
-            remote_delegate_id="remote", trust_domain=TrustDomain(name="test"),
+            session_id="s1",
+            remote_url="http://localhost",
+            remote_delegate_id="remote",
+            trust_domain=TrustDomain(name="test"),
             ttl_secs=1,
         )
         session.last_used = datetime.now(timezone.utc) - timedelta(seconds=2)
@@ -456,18 +480,24 @@ class TestSessionAdvanced:
 
     def test_session_active_within_ttl(self):
         from ldp_protocol.types.session import LdpSession
+
         session = LdpSession(
-            session_id="s1", remote_url="http://localhost",
-            remote_delegate_id="remote", trust_domain=TrustDomain(name="test"),
+            session_id="s1",
+            remote_url="http://localhost",
+            remote_delegate_id="remote",
+            trust_domain=TrustDomain(name="test"),
             ttl_secs=3600,
         )
         assert session.is_active
 
     def test_closed_session_not_active(self):
         from ldp_protocol.types.session import LdpSession, SessionState
+
         session = LdpSession(
-            session_id="s1", remote_url="http://localhost",
-            remote_delegate_id="remote", state=SessionState.CLOSED,
+            session_id="s1",
+            remote_url="http://localhost",
+            remote_delegate_id="remote",
+            state=SessionState.CLOSED,
             trust_domain=TrustDomain(name="test"),
         )
         assert not session.is_active
@@ -475,9 +505,12 @@ class TestSessionAdvanced:
     def test_session_touch_updates_timestamp(self):
         import time
         from ldp_protocol.types.session import LdpSession
+
         session = LdpSession(
-            session_id="s1", remote_url="http://localhost",
-            remote_delegate_id="remote", trust_domain=TrustDomain(name="test"),
+            session_id="s1",
+            remote_url="http://localhost",
+            remote_delegate_id="remote",
+            trust_domain=TrustDomain(name="test"),
         )
         old_time = session.last_used
         time.sleep(0.01)
@@ -552,7 +585,9 @@ class TestEvidenceRef:
 class TestProvenanceEntry:
     def test_creation(self):
         entry = ProvenanceEntry(
-            delegate_id="d1", model_version="v1", step="reasoning",
+            delegate_id="d1",
+            model_version="v1",
+            step="reasoning",
             verification_status=VerificationStatus.SELF_VERIFIED,
         )
         assert entry.step == "reasoning"
@@ -570,14 +605,23 @@ class TestProvenanceVerification:
         assert p.verified is True
 
     def test_normalize_syncs_old_verified_true(self):
-        p = Provenance.model_validate({
-            "produced_by": "d1", "model_version": "v1",
-            "payload_mode_used": "text", "verified": True,
-        })
+        p = Provenance.model_validate(
+            {
+                "produced_by": "d1",
+                "model_version": "v1",
+                "payload_mode_used": "text",
+                "verified": True,
+            }
+        )
         assert p.verification_status == VerificationStatus.SELF_VERIFIED
 
     def test_backward_compat_no_verification_fields(self):
-        old = {"produced_by": "d1", "model_version": "v1", "payload_mode_used": "text", "verified": False}
+        old = {
+            "produced_by": "d1",
+            "model_version": "v1",
+            "payload_mode_used": "text",
+            "verified": False,
+        }
         p = Provenance.model_validate(old)
         assert p.verification_status == VerificationStatus.UNVERIFIED
         assert p.lineage == []

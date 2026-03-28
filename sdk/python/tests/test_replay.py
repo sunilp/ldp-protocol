@@ -1,4 +1,5 @@
 """Tests for replay detection."""
+
 from datetime import datetime, timedelta, timezone
 
 from ldp_protocol.replay import ReplayGuard

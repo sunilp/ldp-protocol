@@ -26,9 +26,7 @@ class Provenance(BaseModel):
     confidence: float | None = None
     verified: bool = False  # Deprecated: use verification_status
     session_id: str | None = None
-    timestamp: str | None = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    timestamp: str | None = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     tokens_used: int | None = None
     cost_usd: float | None = None
     contract_id: str | None = None
