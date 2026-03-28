@@ -73,7 +73,6 @@ pub struct QualityMetrics {
     pub claim_type: ClaimType,
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
