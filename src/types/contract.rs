@@ -66,17 +66,12 @@ impl Default for PolicyEnvelope {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FailurePolicy {
     FailClosed,
+    #[default]
     FailOpen,
-}
-
-impl Default for FailurePolicy {
-    fn default() -> Self {
-        FailurePolicy::FailOpen
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

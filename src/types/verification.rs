@@ -3,20 +3,15 @@
 use serde::{Deserialize, Serialize};
 
 /// How a result was verified.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum VerificationStatus {
+    #[default]
     Unverified,
     SelfVerified,
     PeerVerified,
     ToolVerified,
     HumanVerified,
-}
-
-impl Default for VerificationStatus {
-    fn default() -> Self {
-        VerificationStatus::Unverified
-    }
 }
 
 /// Reference to supporting evidence.

@@ -196,13 +196,13 @@ impl ProtocolAdapter for LdpAdapter {
         let identity = self.client.fetch_identity_card(url).await?;
 
         // Trust domain check.
-        if self.config.enforce_trust_domains {
-            if !self.config.trust_domain.trusts(&identity.trust_domain.name) {
-                return Err(format!(
-                    "Trust domain '{}' is not trusted by '{}'",
-                    identity.trust_domain.name, self.config.trust_domain.name
-                ));
-            }
+        if self.config.enforce_trust_domains
+            && !self.config.trust_domain.trusts(&identity.trust_domain.name)
+        {
+            return Err(format!(
+                "Trust domain '{}' is not trusted by '{}'",
+                identity.trust_domain.name, self.config.trust_domain.name
+            ));
         }
 
         // Convert to RemoteCapabilities.

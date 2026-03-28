@@ -176,7 +176,7 @@ impl LdpServer {
                 self.handle_task_cancel(&envelope, task_id).await
             }
             LdpMessageBody::SessionClose { .. } => self.handle_session_close(&envelope).await,
-            _ => Err(format!("Unhandled message type")),
+            _ => Err("Unhandled message type".to_string()),
         }?;
 
         // Sign outgoing response

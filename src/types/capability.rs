@@ -7,10 +7,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// How a quality claim was established — addresses the provenance paradox.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClaimType {
     /// Quality scores reported by the delegate itself.
+    #[default]
     SelfClaimed,
     /// Quality scores attested by a trusted third-party issuer.
     IssuerAttested,
@@ -18,12 +19,6 @@ pub enum ClaimType {
     RuntimeObserved,
     /// Quality scores verified by an external benchmarking service.
     ExternallyBenchmarked,
-}
-
-impl Default for ClaimType {
-    fn default() -> Self {
-        ClaimType::SelfClaimed
-    }
 }
 
 /// An LDP capability — a skill with quality/latency/cost metadata.
@@ -53,7 +48,7 @@ pub struct LdpCapability {
 ///
 /// These metrics enable intelligent routing: the JamJet workflow engine
 /// can select among multiple delegates based on quality-cost tradeoffs.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct QualityMetrics {
     /// Self-reported quality score (0.0 – 1.0).
     pub quality_score: Option<f64>,
@@ -78,19 +73,6 @@ pub struct QualityMetrics {
     pub claim_type: ClaimType,
 }
 
-impl Default for QualityMetrics {
-    fn default() -> Self {
-        Self {
-            quality_score: None,
-            latency_p50_ms: None,
-            latency_p99_ms: None,
-            cost_per_call_usd: None,
-            max_tokens: None,
-            supports_streaming: false,
-            claim_type: ClaimType::default(),
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {
