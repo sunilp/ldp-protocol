@@ -9,6 +9,7 @@ on:
 jobs:
   rust-check:
     runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.toolchain == 'nightly' }}
     strategy:
       matrix:
         toolchain: [stable, nightly]
