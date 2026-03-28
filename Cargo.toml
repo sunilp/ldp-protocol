@@ -1,7 +1,7 @@
 [package]
 name = "ldp-protocol"
 description = "LDP — LLM Delegate Protocol: identity-aware communication for multi-agent LLM systems"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/sunilp/ldp-protocol"
