@@ -83,7 +83,9 @@ mod tests {
         let mut registry = ProtocolRegistry::new();
         register_ldp(&mut registry, None);
 
-        assert!(registry.adapter_for_url("ldp://delegate.example.com").is_some());
+        assert!(registry
+            .adapter_for_url("ldp://delegate.example.com")
+            .is_some());
         assert!(registry.adapter_for_url("https://not-ldp.com").is_none());
     }
 

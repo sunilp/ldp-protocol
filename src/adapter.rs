@@ -27,10 +27,7 @@ use tokio::sync::RwLock;
 use tracing::{debug, info, instrument};
 
 /// Validate a task result against its contract. Returns violation codes.
-fn validate_contract(
-    contract: &DelegationContract,
-    provenance: &Provenance,
-) -> Vec<String> {
+fn validate_contract(contract: &DelegationContract, provenance: &Provenance) -> Vec<String> {
     let mut violations = Vec::new();
 
     // Deadline check (client's local UTC time is authoritative)
@@ -407,8 +404,14 @@ impl ProtocolAdapter for LdpAdapter {
                     Ok(TaskStatus::Working)
                 }
             }
-            LdpMessageBody::TaskResult { output, mut provenance, .. } => {
-                provenance.lineage.insert(0, build_lineage_entry(&provenance, "task"));
+            LdpMessageBody::TaskResult {
+                output,
+                mut provenance,
+                ..
+            } => {
+                provenance
+                    .lineage
+                    .insert(0, build_lineage_entry(&provenance, "task"));
                 provenance.normalize();
                 let contracts = self.contracts.read().await;
                 if let Some(contract) = contracts.get(task_id) {

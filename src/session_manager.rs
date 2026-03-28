@@ -119,10 +119,8 @@ impl SessionManager {
         let remote_delegate_id = hello_response.from.clone();
 
         // Step 3: Negotiate payload mode
-        let negotiated = negotiate_payload_mode(
-            &session_config.preferred_payload_modes,
-            &remote_modes,
-        );
+        let negotiated =
+            negotiate_payload_mode(&session_config.preferred_payload_modes, &remote_modes);
 
         debug!(
             mode = %negotiated.mode,

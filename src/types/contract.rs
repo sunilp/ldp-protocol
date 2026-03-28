@@ -93,7 +93,8 @@ mod tests {
 
     #[test]
     fn contract_creation() {
-        let contract = DelegationContract::new("Summarize the document", vec!["<=300 words".into()]);
+        let contract =
+            DelegationContract::new("Summarize the document", vec!["<=300 words".into()]);
         assert!(!contract.contract_id.is_empty());
         assert_eq!(contract.objective, "Summarize the document");
         assert!(contract.deadline.is_none());
@@ -101,15 +102,21 @@ mod tests {
 
     #[test]
     fn contract_with_deadline() {
-        let contract = DelegationContract::new("task", vec![]).with_deadline("2026-12-31T23:59:59Z");
+        let contract =
+            DelegationContract::new("task", vec![]).with_deadline("2026-12-31T23:59:59Z");
         assert_eq!(contract.deadline.as_deref(), Some("2026-12-31T23:59:59Z"));
     }
 
     #[test]
     fn contract_with_budget() {
-        let contract = DelegationContract::new("task", vec![])
-            .with_budget(BudgetPolicy { max_tokens: Some(5000), max_cost_usd: Some(0.05) });
-        assert_eq!(contract.policy.budget.as_ref().unwrap().max_tokens, Some(5000));
+        let contract = DelegationContract::new("task", vec![]).with_budget(BudgetPolicy {
+            max_tokens: Some(5000),
+            max_cost_usd: Some(0.05),
+        });
+        assert_eq!(
+            contract.policy.budget.as_ref().unwrap().max_tokens,
+            Some(5000)
+        );
     }
 
     #[test]
@@ -122,7 +129,10 @@ mod tests {
     fn serialization_roundtrip() {
         let contract = DelegationContract::new("Analyze data", vec!["accuracy > 0.9".into()])
             .with_deadline("2026-06-01T00:00:00Z")
-            .with_budget(BudgetPolicy { max_tokens: Some(10000), max_cost_usd: None })
+            .with_budget(BudgetPolicy {
+                max_tokens: Some(10000),
+                max_cost_usd: None,
+            })
             .with_failure_policy(FailurePolicy::FailClosed);
         let json = serde_json::to_value(&contract).unwrap();
         let restored: DelegationContract = serde_json::from_value(json).unwrap();

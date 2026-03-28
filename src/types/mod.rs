@@ -14,13 +14,13 @@ pub mod session;
 pub mod trust;
 pub mod verification;
 
-pub use capability::{LdpCapability, QualityMetrics, ClaimType};
-pub use contract::{DelegationContract, PolicyEnvelope, FailurePolicy, BudgetPolicy};
-pub use error::{LdpError, FailureCategory, ErrorSeverity};
+pub use capability::{ClaimType, LdpCapability, QualityMetrics};
+pub use contract::{BudgetPolicy, DelegationContract, FailurePolicy, PolicyEnvelope};
+pub use error::{ErrorSeverity, FailureCategory, LdpError};
 pub use identity::LdpIdentityCard;
 pub use messages::{LdpEnvelope, LdpMessageBody};
 pub use payload::PayloadMode;
 pub use provenance::Provenance;
 pub use session::{LdpSession, SessionConfig, SessionState};
 pub use trust::TrustDomain;
-pub use verification::{VerificationStatus, EvidenceRef, ProvenanceEntry};
+pub use verification::{EvidenceRef, ProvenanceEntry, VerificationStatus};

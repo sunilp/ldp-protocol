@@ -50,9 +50,7 @@ pub fn sign_envelope(envelope: &LdpEnvelope, secret: &str) -> String {
             mac.update(reason.as_bytes());
             "SESSION_REJECT"
         }
-        LdpMessageBody::TaskSubmit {
-            task_id, skill, ..
-        } => {
+        LdpMessageBody::TaskSubmit { task_id, skill, .. } => {
             mac.update(task_id.as_bytes());
             mac.update(b"|");
             mac.update(skill.as_bytes());
@@ -148,10 +146,7 @@ mod tests {
         let mut envelope = make_envelope();
         apply_signature(&mut envelope, "test-secret");
         assert!(envelope.signature.is_some());
-        assert_eq!(
-            envelope.signature_algorithm.as_deref(),
-            Some("hmac-sha256")
-        );
+        assert_eq!(envelope.signature_algorithm.as_deref(), Some("hmac-sha256"));
     }
 
     #[test]

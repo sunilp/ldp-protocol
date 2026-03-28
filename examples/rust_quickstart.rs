@@ -11,8 +11,8 @@
 //!
 //! Requires a running LDP delegate at localhost:8090 (see examples/python_sdk/ldp_delegate.py)
 
-use ldp_protocol::{register_ldp, LdpAdapterConfig, SessionConfig, PayloadMode};
 use ldp_protocol::protocol::ProtocolRegistry;
+use ldp_protocol::{register_ldp, LdpAdapterConfig, PayloadMode, SessionConfig};
 
 #[tokio::main]
 async fn main() {
@@ -33,7 +33,10 @@ async fn main() {
     };
 
     println!("Config: delegate_id={}", config.delegate_id);
-    println!("  payload modes: {:?}", config.session.preferred_payload_modes);
+    println!(
+        "  payload modes: {:?}",
+        config.session.preferred_payload_modes
+    );
     println!("  trust enforcement: {}", config.enforce_trust_domains);
     println!("  attach provenance: {}", config.attach_provenance);
 
@@ -43,7 +46,10 @@ async fn main() {
 
     // Now ldp:// URLs are handled by the LDP adapter
     println!("\nRegistered protocols: {:?}", registry.protocols());
-    println!("  ldp:// adapter: {}", registry.adapter_for_url("ldp://localhost:8090").is_some());
+    println!(
+        "  ldp:// adapter: {}",
+        registry.adapter_for_url("ldp://localhost:8090").is_some()
+    );
 
     // 3. In production, use the registry to discover and invoke:
     //

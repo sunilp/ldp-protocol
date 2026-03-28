@@ -38,10 +38,10 @@ pub mod client;
 pub mod config;
 pub mod plugin;
 pub mod protocol;
+pub mod replay;
 pub mod server;
 pub mod session_manager;
 pub mod signing;
-pub mod replay;
 pub mod types;
 
 pub use adapter::LdpAdapter;

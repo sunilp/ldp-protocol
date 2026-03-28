@@ -48,7 +48,10 @@ mod tests {
 
     #[test]
     fn default_verification_is_unverified() {
-        assert_eq!(VerificationStatus::default(), VerificationStatus::Unverified);
+        assert_eq!(
+            VerificationStatus::default(),
+            VerificationStatus::Unverified
+        );
     }
 
     #[test]
@@ -100,6 +103,9 @@ mod tests {
         let json = serde_json::to_value(&entry).unwrap();
         let restored: ProvenanceEntry = serde_json::from_value(json).unwrap();
         assert_eq!(restored.delegate_id, "ldp:delegate:alpha");
-        assert_eq!(restored.verification_status, VerificationStatus::SelfVerified);
+        assert_eq!(
+            restored.verification_status,
+            VerificationStatus::SelfVerified
+        );
     }
 }

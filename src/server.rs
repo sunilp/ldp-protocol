@@ -110,9 +110,7 @@ impl LdpServer {
             metadata: HashMap::new(),
         };
 
-        let handler: TaskHandler = Arc::new(|_skill, input| {
-            json!({ "echo": input })
-        });
+        let handler: TaskHandler = Arc::new(|_skill, input| json!({ "echo": input }));
 
         Self::new(identity, handler)
     }
@@ -152,14 +150,24 @@ impl LdpServer {
         }
 
         let mut response = match &envelope.body {
-            LdpMessageBody::Hello { delegate_id, supported_modes } => {
-                self.handle_hello(&envelope, delegate_id, supported_modes).await
+            LdpMessageBody::Hello {
+                delegate_id,
+                supported_modes,
+            } => {
+                self.handle_hello(&envelope, delegate_id, supported_modes)
+                    .await
             }
             LdpMessageBody::SessionPropose { config } => {
                 self.handle_session_propose(&envelope, config).await
             }
-            LdpMessageBody::TaskSubmit { task_id, skill, input, .. } => {
-                self.handle_task_submit(&envelope, task_id, skill, input).await
+            LdpMessageBody::TaskSubmit {
+                task_id,
+                skill,
+                input,
+                ..
+            } => {
+                self.handle_task_submit(&envelope, task_id, skill, input)
+                    .await
             }
             LdpMessageBody::TaskUpdate { task_id, .. } => {
                 self.handle_task_status_query(&envelope, task_id).await
@@ -167,9 +175,7 @@ impl LdpServer {
             LdpMessageBody::TaskCancel { task_id } => {
                 self.handle_task_cancel(&envelope, task_id).await
             }
-            LdpMessageBody::SessionClose { .. } => {
-                self.handle_session_close(&envelope).await
-            }
+            LdpMessageBody::SessionClose { .. } => self.handle_session_close(&envelope).await,
             _ => Err(format!("Unhandled message type")),
         }?;
 
@@ -315,10 +321,8 @@ impl LdpServer {
         }
 
         // Build provenance.
-        let mut provenance = Provenance::new(
-            &self.identity.delegate_id,
-            &self.identity.model_version,
-        );
+        let mut provenance =
+            Provenance::new(&self.identity.delegate_id, &self.identity.model_version);
         provenance.verification_status = VerificationStatus::SelfVerified;
         #[allow(deprecated)]
         {
@@ -358,10 +362,8 @@ impl LdpServer {
         if let Some(record) = tasks.get(task_id) {
             let body = match record.state {
                 TaskRecordState::Completed => {
-                    let mut provenance = Provenance::new(
-                        &self.identity.delegate_id,
-                        &self.identity.model_version,
-                    );
+                    let mut provenance =
+                        Provenance::new(&self.identity.delegate_id, &self.identity.model_version);
                     provenance.verification_status = VerificationStatus::SelfVerified;
                     #[allow(deprecated)]
                     {
@@ -372,12 +374,15 @@ impl LdpServer {
                         output: record.output.clone().unwrap_or(json!(null)),
                         provenance,
                     }
-                },
+                }
                 TaskRecordState::Failed => LdpMessageBody::TaskFailed {
                     task_id: task_id.to_string(),
                     error: LdpError::runtime(
                         "TASK_FAILED",
-                        record.error.clone().unwrap_or_else(|| "unknown error".into()),
+                        record
+                            .error
+                            .clone()
+                            .unwrap_or_else(|| "unknown error".into()),
                     ),
                 },
                 _ => LdpMessageBody::TaskUpdate {
@@ -423,10 +428,7 @@ impl LdpServer {
     }
 
     /// Handle SESSION_CLOSE.
-    async fn handle_session_close(
-        &self,
-        envelope: &LdpEnvelope,
-    ) -> Result<LdpEnvelope, String> {
+    async fn handle_session_close(&self, envelope: &LdpEnvelope) -> Result<LdpEnvelope, String> {
         info!(session_id = %envelope.session_id, "Session closed");
 
         let mut sessions = self.sessions.write().await;

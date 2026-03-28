@@ -76,10 +76,7 @@ impl LdpIdentityCard {
         labels.insert("ldp.model_family".into(), self.model_family.clone());
         labels.insert("ldp.model_version".into(), self.model_version.clone());
         labels.insert("ldp.trust_domain".into(), self.trust_domain.name.clone());
-        labels.insert(
-            "ldp.context_window".into(),
-            self.context_window.to_string(),
-        );
+        labels.insert("ldp.context_window".into(), self.context_window.to_string());
 
         if let Some(ref fp) = self.weights_fingerprint {
             labels.insert("ldp.weights_fingerprint".into(), fp.clone());

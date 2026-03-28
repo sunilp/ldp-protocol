@@ -21,13 +21,24 @@ impl ReplayGuard {
     }
 
     /// Check if a message should be accepted. Returns Err with reason if rejected.
-    pub fn check(&mut self, message_id: &str, nonce: Option<&str>, timestamp: &str) -> Result<(), String> {
+    pub fn check(
+        &mut self,
+        message_id: &str,
+        nonce: Option<&str>,
+        timestamp: &str,
+    ) -> Result<(), String> {
         // 1. Timestamp freshness check
         if let Ok(msg_time) = chrono::DateTime::parse_from_rfc3339(timestamp) {
             let now = chrono::Utc::now();
-            let diff = (now - msg_time.with_timezone(&chrono::Utc)).num_seconds().unsigned_abs();
+            let diff = (now - msg_time.with_timezone(&chrono::Utc))
+                .num_seconds()
+                .unsigned_abs();
             if diff > self.window.as_secs() {
-                return Err(format!("Message timestamp too old: {}s > {}s window", diff, self.window.as_secs()));
+                return Err(format!(
+                    "Message timestamp too old: {}s > {}s window",
+                    diff,
+                    self.window.as_secs()
+                ));
             }
         }
 

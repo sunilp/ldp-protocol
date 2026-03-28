@@ -4,7 +4,7 @@
 //! which model, what payload mode, confidence, and verification status.
 
 use crate::types::payload::PayloadMode;
-use crate::types::verification::{VerificationStatus, EvidenceRef, ProvenanceEntry};
+use crate::types::verification::{EvidenceRef, ProvenanceEntry, VerificationStatus};
 use serde::{Deserialize, Serialize};
 
 /// Provenance metadata attached to every LDP task result.

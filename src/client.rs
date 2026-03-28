@@ -70,10 +70,7 @@ impl LdpClient {
     ///
     /// Identity cards are served at `{url}/ldp/identity`.
     #[instrument(skip(self), fields(url = %url))]
-    pub async fn fetch_identity_card(
-        &self,
-        url: &str,
-    ) -> Result<LdpIdentityCard, String> {
+    pub async fn fetch_identity_card(&self, url: &str) -> Result<LdpIdentityCard, String> {
         let endpoint = format!("{}/ldp/identity", url.trim_end_matches('/'));
 
         debug!(endpoint = %endpoint, "Fetching LDP identity card");
@@ -105,9 +102,10 @@ impl LdpClient {
         let wellknown = format!("{}/.well-known/ldp-identity", url.trim_end_matches('/'));
 
         match self.http.get(&wellknown).send().await {
-            Ok(resp) if resp.status().is_success() => {
-                resp.json().await.map_err(|e| format!("Failed to parse identity: {e}"))
-            }
+            Ok(resp) if resp.status().is_success() => resp
+                .json()
+                .await
+                .map_err(|e| format!("Failed to parse identity: {e}")),
             _ => self.fetch_identity_card(url).await,
         }
     }

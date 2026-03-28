@@ -70,19 +70,22 @@ async fn handle_connection(stream: tokio::net::TcpStream, server: Arc<LdpServer>
         }
         ("POST", "/ldp/messages") => {
             // Extract JSON body after the blank line.
-            let body_start = request.find("\r\n\r\n").map(|i| i + 4)
+            let body_start = request
+                .find("\r\n\r\n")
+                .map(|i| i + 4)
                 .or_else(|| request.find("\n\n").map(|i| i + 2))
                 .unwrap_or(n);
             let json_body = &request[body_start..];
 
             match serde_json::from_str::<LdpEnvelope>(json_body) {
                 Ok(envelope) => match server.handle_message(envelope).await {
-                    Ok(response) => {
-                        ("200 OK", serde_json::to_string(&response).unwrap())
-                    }
+                    Ok(response) => ("200 OK", serde_json::to_string(&response).unwrap()),
                     Err(e) => ("500 Internal Server Error", json!({"error": e}).to_string()),
                 },
-                Err(e) => ("400 Bad Request", json!({"error": e.to_string()}).to_string()),
+                Err(e) => (
+                    "400 Bad Request",
+                    json!({"error": e.to_string()}).to_string(),
+                ),
             }
         }
         _ => ("404 Not Found", json!({"error": "not found"}).to_string()),
@@ -239,10 +242,7 @@ async fn test_provenance_present_in_output() {
             prov.get("produced_by").unwrap().as_str().unwrap(),
             "ldp:delegate:echo"
         );
-        assert_eq!(
-            prov.get("model_version").unwrap().as_str().unwrap(),
-            "1.0"
-        );
+        assert_eq!(prov.get("model_version").unwrap().as_str().unwrap(), "1.0");
         assert!(prov.get("payload_mode_used").is_some());
     } else {
         panic!("Expected Completed status");
@@ -277,11 +277,11 @@ async fn test_cross_domain_with_trusted_peer_succeeds() {
 
     // Server in "partner" domain, trusts "acme".
     let server = {
-        use ldp_protocol::types::identity::LdpIdentityCard;
         use ldp_protocol::types::capability::LdpCapability;
+        use ldp_protocol::types::identity::LdpIdentityCard;
         use ldp_protocol::types::payload::PayloadMode;
-        use std::collections::HashMap;
         use serde_json::json;
+        use std::collections::HashMap;
 
         let identity = LdpIdentityCard {
             delegate_id: "ldp:delegate:partner".to_string(),
@@ -313,9 +313,8 @@ async fn test_cross_domain_with_trusted_peer_succeeds() {
             metadata: HashMap::new(),
         };
 
-        let handler: ldp_protocol::server::TaskHandler = Arc::new(|_skill, input| {
-            json!({ "echo": input })
-        });
+        let handler: ldp_protocol::server::TaskHandler =
+            Arc::new(|_skill, input| json!({ "echo": input }));
 
         LdpServer::new(identity, handler)
     };
@@ -352,8 +351,8 @@ async fn test_wellknown_discovery() {
 #[tokio::test]
 async fn test_signed_messages() {
     let secret = "shared-test-secret";
-    let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server")
-        .with_signing_secret(secret);
+    let server =
+        LdpServer::echo_server("ldp:delegate:echo", "Echo Server").with_signing_secret(secret);
     let base_url = start_test_server(server).await;
 
     let adapter = LdpAdapter::new(LdpAdapterConfig {
@@ -438,15 +437,31 @@ async fn test_session_expiry_forces_reestablishment() {
         ..Default::default()
     });
 
-    let h1 = adapter.invoke(&base_url, TaskRequest {
-        skill: "echo".into(), input: json!({"call": 1}), contract: None,
-    }).await.unwrap();
+    let h1 = adapter
+        .invoke(
+            &base_url,
+            TaskRequest {
+                skill: "echo".into(),
+                input: json!({"call": 1}),
+                contract: None,
+            },
+        )
+        .await
+        .unwrap();
 
     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
-    let h2 = adapter.invoke(&base_url, TaskRequest {
-        skill: "echo".into(), input: json!({"call": 2}), contract: None,
-    }).await.unwrap();
+    let h2 = adapter
+        .invoke(
+            &base_url,
+            TaskRequest {
+                skill: "echo".into(),
+                input: json!({"call": 2}),
+                contract: None,
+            },
+        )
+        .await
+        .unwrap();
 
     assert_ne!(h1.task_id, h2.task_id);
 }
@@ -467,9 +482,17 @@ async fn test_payload_negotiation_text_only() {
         ..Default::default()
     });
 
-    let handle = adapter.invoke(&base_url, TaskRequest {
-        skill: "echo".into(), input: json!({"mode_test": true}), contract: None,
-    }).await.unwrap();
+    let handle = adapter
+        .invoke(
+            &base_url,
+            TaskRequest {
+                skill: "echo".into(),
+                input: json!({"mode_test": true}),
+                contract: None,
+            },
+        )
+        .await
+        .unwrap();
     assert!(!handle.task_id.is_empty());
 }
 
@@ -494,18 +517,38 @@ async fn test_discover_multiple_skills() {
         latency_profile: None,
         jurisdiction: None,
         capabilities: vec![
-            LdpCapability { name: "reasoning".into(), description: None, input_schema: None, output_schema: None, quality: None, domains: vec![] },
-            LdpCapability { name: "coding".into(), description: None, input_schema: None, output_schema: None, quality: None, domains: vec![] },
-            LdpCapability { name: "writing".into(), description: None, input_schema: None, output_schema: None, quality: None, domains: vec![] },
+            LdpCapability {
+                name: "reasoning".into(),
+                description: None,
+                input_schema: None,
+                output_schema: None,
+                quality: None,
+                domains: vec![],
+            },
+            LdpCapability {
+                name: "coding".into(),
+                description: None,
+                input_schema: None,
+                output_schema: None,
+                quality: None,
+                domains: vec![],
+            },
+            LdpCapability {
+                name: "writing".into(),
+                description: None,
+                input_schema: None,
+                output_schema: None,
+                quality: None,
+                domains: vec![],
+            },
         ],
         supported_payload_modes: vec![PayloadMode::Text],
         endpoint: String::new(),
         metadata: HashMap::new(),
     };
 
-    let handler: ldp_protocol::server::TaskHandler = std::sync::Arc::new(|_s, i| {
-        serde_json::json!({"echo": i})
-    });
+    let handler: ldp_protocol::server::TaskHandler =
+        std::sync::Arc::new(|_s, i| serde_json::json!({"echo": i}));
     let server = LdpServer::new(identity, handler);
     let base_url = start_test_server(server).await;
 
@@ -525,8 +568,8 @@ async fn test_discover_multiple_skills() {
 #[tokio::test]
 async fn test_signed_invoke_has_provenance() {
     let secret = "provenance-test-secret";
-    let server = LdpServer::echo_server("ldp:delegate:echo", "Echo Server")
-        .with_signing_secret(secret);
+    let server =
+        LdpServer::echo_server("ldp:delegate:echo", "Echo Server").with_signing_secret(secret);
     let base_url = start_test_server(server).await;
 
     let adapter = LdpAdapter::new(LdpAdapterConfig {
@@ -537,9 +580,17 @@ async fn test_signed_invoke_has_provenance() {
         ..Default::default()
     });
 
-    let handle = adapter.invoke(&base_url, TaskRequest {
-        skill: "echo".into(), input: json!({"test": "provenance"}), contract: None,
-    }).await.unwrap();
+    let handle = adapter
+        .invoke(
+            &base_url,
+            TaskRequest {
+                skill: "echo".into(),
+                input: json!({"test": "provenance"}),
+                contract: None,
+            },
+        )
+        .await
+        .unwrap();
 
     let status = adapter.status(&base_url, &handle.task_id).await.unwrap();
     match status {
@@ -579,8 +630,14 @@ async fn test_contract_no_violations() {
     match status {
         TaskStatus::Completed { output } => {
             let prov = output.get("ldp_provenance").expect("provenance missing");
-            assert_eq!(prov.get("contract_satisfied").and_then(|v| v.as_bool()), Some(true));
-            let violations = prov.get("contract_violations").and_then(|v| v.as_array()).unwrap();
+            assert_eq!(
+                prov.get("contract_satisfied").and_then(|v| v.as_bool()),
+                Some(true)
+            );
+            let violations = prov
+                .get("contract_violations")
+                .and_then(|v| v.as_array())
+                .unwrap();
             assert!(violations.is_empty());
         }
         other => panic!("Expected Completed, got: {:?}", other),
@@ -599,8 +656,7 @@ async fn test_contract_deadline_exceeded_fail_open() {
         ..Default::default()
     });
 
-    let contract = DelegationContract::new("Echo", vec![])
-        .with_deadline("2020-01-01T00:00:00Z"); // Past deadline
+    let contract = DelegationContract::new("Echo", vec![]).with_deadline("2020-01-01T00:00:00Z"); // Past deadline
 
     let task = TaskRequest {
         skill: "echo".into(),
@@ -614,9 +670,17 @@ async fn test_contract_deadline_exceeded_fail_open() {
     match status {
         TaskStatus::Completed { output } => {
             let prov = output.get("ldp_provenance").expect("provenance missing");
-            assert_eq!(prov.get("contract_satisfied").and_then(|v| v.as_bool()), Some(false));
-            let violations = prov.get("contract_violations").and_then(|v| v.as_array()).unwrap();
-            assert!(violations.iter().any(|v| v.as_str() == Some("deadline_exceeded")));
+            assert_eq!(
+                prov.get("contract_satisfied").and_then(|v| v.as_bool()),
+                Some(false)
+            );
+            let violations = prov
+                .get("contract_violations")
+                .and_then(|v| v.as_array())
+                .unwrap();
+            assert!(violations
+                .iter()
+                .any(|v| v.as_str() == Some("deadline_exceeded")));
         }
         other => panic!("Expected Completed (FailOpen), got: {:?}", other),
     }
@@ -650,7 +714,10 @@ async fn test_contract_deadline_fail_closed() {
     match status {
         TaskStatus::Failed { error } => {
             assert_eq!(error.code, "CONTRACT_VIOLATED");
-            assert!(error.partial_output.is_some(), "FailClosed should preserve output");
+            assert!(
+                error.partial_output.is_some(),
+                "FailClosed should preserve output"
+            );
         }
         other => panic!("Expected Failed, got: {:?}", other),
     }
@@ -714,7 +781,9 @@ async fn test_result_has_lineage_entry() {
                 Some("ldp:delegate:echo")
             );
             assert_eq!(
-                lineage[0].get("verification_status").and_then(|v| v.as_str()),
+                lineage[0]
+                    .get("verification_status")
+                    .and_then(|v| v.as_str()),
                 Some("self_verified")
             );
         }
