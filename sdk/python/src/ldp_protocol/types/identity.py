@@ -35,6 +35,17 @@ class LdpIdentityCard(BaseModel):
     endpoint: str = ""
     metadata: dict[str, str] = Field(default_factory=dict)
 
+    def advertised_payload_modes(self) -> list[PayloadMode]:
+        """Declared payload modes whose codec is actually available here.
+
+        Filters ``supported_payload_modes`` down to the modes this process
+        can honestly speak — built-in modes, plus any registered via
+        ``register_payload_mode``. Negotiation should use this rather than
+        the raw declared list, so a party that *declares* a rich mode but
+        has no codec for it does not end up agreeing to speak it.
+        """
+        return [m for m in self.supported_payload_modes if m.is_implemented]
+
     def capability(self, name: str) -> LdpCapability | None:
         """Find a capability by name."""
         for cap in self.capabilities:

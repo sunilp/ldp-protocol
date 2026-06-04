@@ -162,6 +162,17 @@ class LdpClient:
         Performs the full handshake: HELLO -> CAPABILITY_MANIFEST ->
         SESSION_PROPOSE -> SESSION_ACCEPT.
         """
+        # Only advertise modes we can actually speak: a party advertises a
+        # mode only once it has a codec for it (mirrors the responder-side
+        # honesty in LdpDelegate). is_implemented covers the built-in modes
+        # plus anything registered via register_payload_mode, so a client
+        # configured for SEMANTIC_GRAPH without a registered codec will not
+        # propose it and cannot be talked into committing to a mode it can't
+        # encode.
+        advertised_modes = [
+            m for m in self.config.preferred_payload_modes if m.is_implemented
+        ]
+
         # Step 1: HELLO
         hello = LdpEnvelope.create(
             session_id="",
@@ -169,7 +180,7 @@ class LdpClient:
             to_id=url,
             body=LdpMessageBody.hello(
                 delegate_id=self.delegate_id,
-                supported_modes=self.config.preferred_payload_modes,
+                supported_modes=advertised_modes,
             ),
         )
         await self.send_message(url, hello)
@@ -182,9 +193,7 @@ class LdpClient:
             to_id=url,
             body=LdpMessageBody.session_propose(
                 config={
-                    "preferred_payload_modes": [
-                        m.value for m in self.config.preferred_payload_modes
-                    ],
+                    "preferred_payload_modes": [m.value for m in advertised_modes],
                     "ttl_secs": self.config.ttl_secs,
                     "trust_domain": self.trust_domain.name,
                 }
@@ -200,6 +209,15 @@ class LdpClient:
 
         # Build session from response
         negotiated_mode = propose_resp.body.negotiated_mode or PayloadMode.TEXT
+        # The responder must not push us onto a mode we can't speak. A correct
+        # peer only returns a mode we advertised; TEXT is the mandatory
+        # universal floor and is always acceptable. Anything else is a protocol
+        # violation we refuse rather than silently send tasks we can't encode.
+        if negotiated_mode != PayloadMode.TEXT and negotiated_mode not in advertised_modes:
+            raise ConnectionError(
+                f"Responder negotiated payload mode '{negotiated_mode.value}', which "
+                f"this client did not advertise and cannot encode"
+            )
         identity = await self.discover(url)
 
         session = LdpSession(
