@@ -228,18 +228,21 @@ class LdpDelegate(ABC):
             )
 
         session_id = str(uuid4())
-        # Negotiate payload mode
+        # Negotiate payload mode. `config` is untrusted wire input
+        # (dict[str, Any], unvalidated), so both the preferred-modes list AND its
+        # items may be malformed. Treat a non-list as "no preference expressed"
+        # and drop non-string / unknown / forward-compat items, so a Mode-3-aware
+        # peer and an older peer still negotiate down to a shared known mode
+        # instead of crashing the handler — a non-iterable would raise on
+        # iteration, and an unhashable item would raise on the membership check.
         initiator_modes = []
-        if envelope.body.config and "preferred_payload_modes" in envelope.body.config:
-            # Skip unknown / forward-compat mode strings instead of crashing
-            # the handler: a Mode-3-aware peer and an older peer must still be
-            # able to negotiate down to a shared known mode.
-            valid_modes = {mode.value for mode in PayloadMode}
-            initiator_modes = [
-                PayloadMode(m)
-                for m in envelope.body.config["preferred_payload_modes"]
-                if m in valid_modes
-            ]
+        if envelope.body.config:
+            raw_modes = envelope.body.config.get("preferred_payload_modes")
+            if isinstance(raw_modes, list):
+                valid_modes = {mode.value for mode in PayloadMode}
+                initiator_modes = [
+                    PayloadMode(m) for m in raw_modes if isinstance(m, str) and m in valid_modes
+                ]
         negotiated = negotiate_payload_mode(
             initiator_modes, self.identity.advertised_payload_modes()
         )

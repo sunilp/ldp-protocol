@@ -107,7 +107,10 @@ class TestClientAdvertisingHonesty:
         _stub_network(monkeypatch, sent, accept_mode=PayloadMode.SEMANTIC_GRAPH)
         client = _client()  # SEMANTIC_GRAPH not registered → not advertised
         try:
-            with pytest.raises(ConnectionError):
+            # Assert the contract-violation message specifically, so the test
+            # verifies the advertise/encode rejection rather than any incidental
+            # ConnectionError on the way to the handshake.
+            with pytest.raises(ConnectionError, match=r"did not advertise and cannot encode"):
                 await client.establish_session("http://remote")
         finally:
             await client.close()

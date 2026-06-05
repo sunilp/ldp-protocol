@@ -212,6 +212,55 @@ class TestMode3Negotiation:
         assert resp.body.type == "SESSION_ACCEPT"
         assert resp.body.negotiated_mode == PayloadMode.TEXT
 
+    @pytest.mark.asyncio
+    async def test_non_string_mode_does_not_crash(self):
+        # A malformed peer may put non-string (here, unhashable) entries in
+        # preferred_payload_modes. The set-membership filter raises TypeError on
+        # an unhashable item, so non-strings must be dropped before the check —
+        # the handler skips them and negotiates down to a shared known mode
+        # instead of crashing on untrusted wire input.
+        delegate = _make_delegate()
+        env = LdpEnvelope.create(
+            "s1",
+            "client",
+            "delegate",
+            body=LdpMessageBody.session_propose(
+                config={
+                    "preferred_payload_modes": [
+                        {"mode": "semantic_graph"},
+                        ["text"],
+                        "text",
+                    ],
+                    "trust_domain": "default",
+                }
+            ),
+        )
+        resp = await delegate.handle_message(env)
+        assert resp.body.type == "SESSION_ACCEPT"
+        assert resp.body.negotiated_mode == PayloadMode.TEXT
+
+    @pytest.mark.asyncio
+    async def test_non_list_modes_does_not_crash(self):
+        # preferred_payload_modes itself is untrusted wire input (Any). A peer
+        # sending a non-iterable scalar would raise TypeError on `for m in ...`
+        # and escape as an unhandled 500; a non-list is treated as "no
+        # preference expressed" and negotiation falls to the TEXT floor.
+        delegate = _make_delegate()
+        env = LdpEnvelope.create(
+            "s1",
+            "client",
+            "delegate",
+            body=LdpMessageBody.session_propose(
+                config={
+                    "preferred_payload_modes": 3,
+                    "trust_domain": "default",
+                }
+            ),
+        )
+        resp = await delegate.handle_message(env)
+        assert resp.body.type == "SESSION_ACCEPT"
+        assert resp.body.negotiated_mode == PayloadMode.TEXT
+
     def test_advertised_identity_filters_unregistered_modes(self):
         delegate = _graph_delegate("ldp:delegate:adv-id")
         # The advertised (served) card narrows to modes it can actually speak,
