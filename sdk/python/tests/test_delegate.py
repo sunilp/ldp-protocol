@@ -1,6 +1,7 @@
 """Tests for LDP delegate base class."""
 
 import pytest
+
 from ldp_protocol.delegate import LdpDelegate
 from ldp_protocol.types import (
     LdpCapability,
@@ -376,3 +377,58 @@ class TestLifecycleHooks:
             "s1", "client", "delegate", body=LdpMessageBody.session_close("done")
         )
         assert (await delegate.handle_message(close)).body.type == "SESSION_CLOSE"
+
+
+class TestHttpRouteEnvelopeParsing:
+    """The /ldp/messages route must answer malformed input with a 400 (a
+    structured LDP error), not leak the parse failure as an unhandled 500."""
+
+    def _client(self):
+        # starlette ships in the optional [server] extra, not [dev]: skip only
+        # the route tests (not the whole module) when it is absent.
+        testclient = pytest.importorskip("starlette.testclient")
+        return testclient.TestClient(_make_delegate()._build_app())
+
+    def test_malformed_json_returns_400(self):
+        resp = self._client().post("/ldp/messages", content=b"{ not valid json")
+        assert resp.status_code == 400
+        assert resp.json()["error"]["code"] == "MALFORMED_ENVELOPE"
+
+    def test_invalid_envelope_returns_400(self):
+        # Well-formed JSON, but not a valid envelope (the required `body` is
+        # absent) — model_validate raises, and the route must map it to 400.
+        resp = self._client().post("/ldp/messages", json={"session_id": "s1"})
+        assert resp.status_code == 400
+        assert resp.json()["error"]["code"] == "MALFORMED_ENVELOPE"
+
+    def test_valid_envelope_still_dispatches(self):
+        # The hardening must not change the happy path: a real envelope still
+        # routes through handle_message and returns 200.
+        env = LdpEnvelope.create(
+            "", "client", "delegate", body=LdpMessageBody.hello("client", [PayloadMode.TEXT])
+        )
+        resp = self._client().post("/ldp/messages", json=env.model_dump(by_alias=True))
+        assert resp.status_code == 200
+        assert resp.json()["body"]["type"] == "CAPABILITY_MANIFEST"
+
+    def test_identity_route_unaffected(self):
+        resp = self._client().get("/ldp/identity")
+        assert resp.status_code == 200
+        assert resp.json()["delegate_id"] == "ldp:delegate:echo-test"
+
+    def test_session_accept_serializes_payload_mode(self):
+        # A real SESSION_PROPOSE -> SESSION_ACCEPT round-trip pushes a PayloadMode
+        # enum through JSONResponse; confirm it serializes to its string value
+        # over the wire (the StrEnum path) rather than failing or leaking a repr.
+        env = LdpEnvelope.create(
+            "s1",
+            "client",
+            "delegate",
+            body=LdpMessageBody.session_propose(
+                {"preferred_payload_modes": ["text"], "trust_domain": "default"}
+            ),
+        )
+        resp = self._client().post("/ldp/messages", json=env.model_dump(by_alias=True))
+        assert resp.status_code == 200
+        assert resp.json()["body"]["type"] == "SESSION_ACCEPT"
+        assert resp.json()["body"]["negotiated_mode"] == "text"
