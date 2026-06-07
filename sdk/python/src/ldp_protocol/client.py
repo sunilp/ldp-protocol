@@ -169,9 +169,7 @@ class LdpClient:
         # configured for SEMANTIC_GRAPH without a registered codec will not
         # propose it and cannot be talked into committing to a mode it can't
         # encode.
-        advertised_modes = [
-            m for m in self.config.preferred_payload_modes if m.is_implemented
-        ]
+        advertised_modes = [m for m in self.config.preferred_payload_modes if m.is_implemented]
 
         # Step 1: HELLO
         hello = LdpEnvelope.create(

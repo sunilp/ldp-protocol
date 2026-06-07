@@ -109,9 +109,7 @@ class LdpDelegate(ABC):
         to set up per-session state, logging, metrics, etc.
         """
 
-    def on_mode_change(
-        self, session_id: str, old_mode: PayloadMode, new_mode: PayloadMode
-    ) -> None:
+    def on_mode_change(self, session_id: str, old_mode: PayloadMode, new_mode: PayloadMode) -> None:
         """NOT YET CALLED BY CORE — overriding this has no effect in v1.
 
         This is the designated reaction point for mid-session mode transitions

@@ -40,10 +40,7 @@ class PayloadMode(str, Enum):
         flip a richer mode on at runtime, so do not cache this as if it were
         a constant.
         """
-        return (
-            self in (PayloadMode.TEXT, PayloadMode.SEMANTIC_FRAME)
-            or self in _registered_modes
-        )
+        return self in (PayloadMode.TEXT, PayloadMode.SEMANTIC_FRAME) or self in _registered_modes
 
 
 _registered_modes: set[PayloadMode] = set()
