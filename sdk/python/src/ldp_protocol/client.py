@@ -11,7 +11,7 @@ import httpx
 from ldp_protocol.types.contract import DelegationContract, FailurePolicy
 from ldp_protocol.types.error import LdpError
 from ldp_protocol.types.identity import LdpIdentityCard
-from ldp_protocol.types.messages import LdpEnvelope, LdpMessageBody
+from ldp_protocol.types.messages import LdpEnvelope, LdpMessageBody, SessionProposeConfig
 from ldp_protocol.types.payload import PayloadMode
 from ldp_protocol.types.provenance import Provenance
 from ldp_protocol.types.session import LdpSession, SessionConfig, SessionState
@@ -190,11 +190,11 @@ class LdpClient:
             from_id=self.delegate_id,
             to_id=url,
             body=LdpMessageBody.session_propose(
-                config={
-                    "preferred_payload_modes": [m.value for m in advertised_modes],
-                    "ttl_secs": self.config.ttl_secs,
-                    "trust_domain": self.trust_domain.name,
-                }
+                config=SessionProposeConfig(
+                    preferred_payload_modes=advertised_modes,
+                    ttl_secs=self.config.ttl_secs,
+                    trust_domain=self.trust_domain.name,
+                )
             ),
         )
         propose_resp = await self.send_message(url, propose)
