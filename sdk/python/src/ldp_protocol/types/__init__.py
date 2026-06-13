@@ -1,6 +1,11 @@
 """LDP protocol type definitions — pydantic models matching the Rust reference implementation."""
 
-from ldp_protocol.types.payload import NegotiatedPayload, PayloadMode, negotiate_payload_mode
+from ldp_protocol.types.payload import (
+    NegotiatedPayload,
+    PayloadMode,
+    negotiate_payload_mode,
+    register_payload_mode,
+)
 from ldp_protocol.types.trust import TrustDomain
 from ldp_protocol.types.capability import ClaimType, LdpCapability, QualityMetrics
 from ldp_protocol.types.contract import (
@@ -20,6 +25,7 @@ __all__ = [
     "PayloadMode",
     "NegotiatedPayload",
     "negotiate_payload_mode",
+    "register_payload_mode",
     "TrustDomain",
     "ClaimType",
     "LdpCapability",

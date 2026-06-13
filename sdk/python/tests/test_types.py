@@ -11,6 +11,7 @@ from ldp_protocol.types import (
     SessionConfig,
     TrustDomain,
     negotiate_payload_mode,
+    register_payload_mode,
 )
 from ldp_protocol.types.capability import ClaimType
 from ldp_protocol.types.error import ErrorSeverity, FailureCategory, LdpError
@@ -23,11 +24,19 @@ class TestPayloadMode:
         assert PayloadMode.EMBEDDING_HINTS.mode_number == 2
         assert PayloadMode.SEMANTIC_GRAPH.mode_number == 3
 
-    def test_is_implemented(self):
+    def test_is_implemented_builtins_always_available(self):
         assert PayloadMode.TEXT.is_implemented
         assert PayloadMode.SEMANTIC_FRAME.is_implemented
+
+    def test_is_implemented_richer_modes_require_registration(self):
+        # Unregistered, richer modes report no in-process codec.
         assert not PayloadMode.EMBEDDING_HINTS.is_implemented
         assert not PayloadMode.SEMANTIC_GRAPH.is_implemented
+        # Registering a codec flips the informational flag on.
+        register_payload_mode(PayloadMode.SEMANTIC_GRAPH)
+        assert PayloadMode.SEMANTIC_GRAPH.is_implemented
+        # Other modes are unaffected.
+        assert not PayloadMode.EMBEDDING_HINTS.is_implemented
 
 
 class TestPayloadNegotiation:
@@ -51,12 +60,93 @@ class TestPayloadNegotiation:
         result = negotiate_payload_mode([], [])
         assert result.mode == PayloadMode.TEXT
 
-    def test_skips_unimplemented_modes(self):
+    def test_negotiation_trusts_declared_modes_without_gate(self):
+        # Negotiation respects what both parties declare; it does NOT consult
+        # is_implemented. (Pre-fix this returned TEXT because SEMANTIC_GRAPH
+        # was hardcoded off — that was the bug in #15.) Honest advertising is
+        # enforced one layer up; see TestAdvertisedPayloadModes + the delegate
+        # integration tests.
         result = negotiate_payload_mode(
             [PayloadMode.SEMANTIC_GRAPH, PayloadMode.SEMANTIC_FRAME, PayloadMode.TEXT],
             [PayloadMode.SEMANTIC_GRAPH, PayloadMode.TEXT],
         )
-        assert result.mode == PayloadMode.TEXT
+        assert result.mode == PayloadMode.SEMANTIC_GRAPH
+
+    def test_two_semantic_graph_parties_negotiate_mode_3(self):
+        # The test Sunil explicitly asked for in #15: two parties both
+        # declaring SEMANTIC_GRAPH actually negotiate Mode 3.
+        register_payload_mode(PayloadMode.SEMANTIC_GRAPH)
+        prefs = [PayloadMode.SEMANTIC_GRAPH, PayloadMode.SEMANTIC_FRAME, PayloadMode.TEXT]
+        result = negotiate_payload_mode(prefs, prefs)
+        assert result.mode == PayloadMode.SEMANTIC_GRAPH
+        assert result.fallback_chain == [PayloadMode.SEMANTIC_FRAME, PayloadMode.TEXT]
+
+    def test_fallback_chain_dedups_duplicate_prefs(self):
+        # Preference lists come from untrusted peers and may carry duplicates;
+        # the fallback chain must stay de-duplicated.
+        result = negotiate_payload_mode(
+            [
+                PayloadMode.SEMANTIC_FRAME,
+                PayloadMode.SEMANTIC_FRAME,
+                PayloadMode.TEXT,
+                PayloadMode.TEXT,
+            ],
+            [PayloadMode.SEMANTIC_FRAME, PayloadMode.TEXT],
+        )
+        assert result.mode == PayloadMode.SEMANTIC_FRAME
+        assert result.fallback_chain == [PayloadMode.TEXT]
+
+
+class TestAdvertisedPayloadModes:
+    def _card(self, modes: list[PayloadMode]) -> LdpIdentityCard:
+        return LdpIdentityCard(
+            delegate_id="ldp:delegate:adv",
+            name="Adv",
+            model_family="test",
+            model_version="1.0",
+            trust_domain=TrustDomain(name="test"),
+            context_window=128000,
+            supported_payload_modes=modes,
+        )
+
+    def test_unregistered_rich_mode_not_advertised(self):
+        card = self._card(
+            [PayloadMode.SEMANTIC_GRAPH, PayloadMode.SEMANTIC_FRAME, PayloadMode.TEXT]
+        )
+        # No codec registered → a declared SEMANTIC_GRAPH is not advertised.
+        assert card.advertised_payload_modes() == [
+            PayloadMode.SEMANTIC_FRAME,
+            PayloadMode.TEXT,
+        ]
+
+    def test_registered_rich_mode_is_advertised(self):
+        register_payload_mode(PayloadMode.SEMANTIC_GRAPH)
+        card = self._card(
+            [PayloadMode.SEMANTIC_GRAPH, PayloadMode.SEMANTIC_FRAME, PayloadMode.TEXT]
+        )
+        assert card.advertised_payload_modes() == [
+            PayloadMode.SEMANTIC_GRAPH,
+            PayloadMode.SEMANTIC_FRAME,
+            PayloadMode.TEXT,
+        ]
+
+    def test_builtin_modes_always_advertised(self):
+        card = self._card([PayloadMode.SEMANTIC_FRAME, PayloadMode.TEXT])
+        assert card.advertised_payload_modes() == [
+            PayloadMode.SEMANTIC_FRAME,
+            PayloadMode.TEXT,
+        ]
+
+    def test_advertising_generalizes_beyond_mode_3(self):
+        # The honesty filter is not special-cased to SEMANTIC_GRAPH; any
+        # non-built-in mode (e.g. EMBEDDING_HINTS) is filtered until registered.
+        card = self._card([PayloadMode.EMBEDDING_HINTS, PayloadMode.TEXT])
+        assert card.advertised_payload_modes() == [PayloadMode.TEXT]
+        register_payload_mode(PayloadMode.EMBEDDING_HINTS)
+        assert card.advertised_payload_modes() == [
+            PayloadMode.EMBEDDING_HINTS,
+            PayloadMode.TEXT,
+        ]
 
 
 class TestTrustDomain:

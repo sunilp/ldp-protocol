@@ -10,7 +10,7 @@ from ldp_protocol.types.capability import LdpCapability
 from ldp_protocol.types.error import LdpError
 from ldp_protocol.types.identity import LdpIdentityCard
 from ldp_protocol.types.messages import LdpEnvelope, LdpMessageBody
-from ldp_protocol.types.payload import PayloadMode, negotiate_payload_mode
+from ldp_protocol.types.payload import NegotiatedPayload, PayloadMode, negotiate_payload_mode
 from ldp_protocol.types.provenance import Provenance
 from ldp_protocol.types.trust import TrustDomain
 from ldp_protocol.types.verification import VerificationStatus
@@ -90,6 +90,59 @@ class LdpDelegate(ABC):
             Tuple of (output_data, confidence_score).
         """
         ...
+
+    # ------------------------------------------------------------------
+    # Lifecycle hooks — override to react to session / mode transitions.
+    #
+    # Default implementations are no-ops, so a subclass opts in only to the
+    # transitions it cares about without overriding core protocol logic.
+    # These run SYNCHRONOUSLY inside the protocol response path; keep an
+    # override fast and non-throwing — a hook that raises aborts the in-flight
+    # SESSION_ACCEPT / SESSION_CLOSE (fail-loud, by design).
+    # ------------------------------------------------------------------
+
+    def on_session_start(self, session_id: str, negotiated: NegotiatedPayload) -> None:
+        """Called when a session has been accepted and a payload mode agreed.
+
+        Fires from ``_handle_session_propose`` after SESSION_ACCEPT is built,
+        with the freshly-minted session id the accept carries back. Override
+        to set up per-session state, logging, metrics, etc.
+        """
+
+    def on_mode_change(self, session_id: str, old_mode: PayloadMode, new_mode: PayloadMode) -> None:
+        """NOT YET CALLED BY CORE — overriding this has no effect in v1.
+
+        This is the designated reaction point for mid-session mode transitions
+        (adaptive degradation, per-message fallback). The v1 contract Sunil set
+        in #14 is per-message fallback + re-negotiate-from-scratch, and adaptive
+        degradation is explicitly v-next — so the core does not emit a
+        mid-session mode change yet. The signature is provided now (per his
+        "propose signatures alongside the #15 work" invitation) so that
+        implementations and future SDK versions have a stable hook to call;
+        core wiring lands with the adaptive-degradation work.
+        """
+
+    def on_session_end(self, session_id: str, reason: str) -> None:
+        """Called when a session is closed.
+
+        Fires from ``_handle_session_close`` when a SESSION_CLOSE is handled.
+        Override to tear down per-session state, flush metrics, etc. (Note: the
+        bundled ``LdpClient`` does not send SESSION_CLOSE, so today this fires
+        only for external/manual closers.)
+        """
+
+    def advertised_identity(self) -> LdpIdentityCard:
+        """This delegate's identity card with payload modes narrowed to the
+        ones it can actually speak in this process.
+
+        Publish THIS anywhere the card goes to peers (the discovery endpoint,
+        capability exchange) so the advertised modes match what negotiation
+        will honestly agree to. ``self.identity`` keeps the full declared
+        intent; this is the honest on-the-wire view of it.
+        """
+        return self.identity.model_copy(
+            update={"supported_payload_modes": self.identity.advertised_payload_modes()}
+        )
 
     async def handle_message(self, envelope: LdpEnvelope) -> LdpEnvelope:
         """Route an incoming LDP message to the appropriate handler."""
@@ -173,15 +226,26 @@ class LdpDelegate(ABC):
             )
 
         session_id = str(uuid4())
-        # Negotiate payload mode
+        # Negotiate payload mode. `config` is untrusted wire input
+        # (dict[str, Any], unvalidated), so both the preferred-modes list AND its
+        # items may be malformed. Treat a non-list as "no preference expressed"
+        # and drop non-string / unknown / forward-compat items, so a Mode-3-aware
+        # peer and an older peer still negotiate down to a shared known mode
+        # instead of crashing the handler — a non-iterable would raise on
+        # iteration, and an unhashable item would raise on the membership check.
         initiator_modes = []
-        if envelope.body.config and "preferred_payload_modes" in envelope.body.config:
-            initiator_modes = [
-                PayloadMode(m) for m in envelope.body.config["preferred_payload_modes"]
-            ]
-        negotiated = negotiate_payload_mode(initiator_modes, self.identity.supported_payload_modes)
+        if envelope.body.config:
+            raw_modes = envelope.body.config.get("preferred_payload_modes")
+            if isinstance(raw_modes, list):
+                valid_modes = {mode.value for mode in PayloadMode}
+                initiator_modes = [
+                    PayloadMode(m) for m in raw_modes if isinstance(m, str) and m in valid_modes
+                ]
+        negotiated = negotiate_payload_mode(
+            initiator_modes, self.identity.advertised_payload_modes()
+        )
 
-        return LdpEnvelope.create(
+        accept = LdpEnvelope.create(
             session_id=session_id,
             from_id=self.identity.delegate_id,
             to_id=envelope.from_,
@@ -190,6 +254,10 @@ class LdpDelegate(ABC):
                 negotiated_mode=negotiated.mode,
             ),
         )
+
+        self.on_session_start(session_id, negotiated)
+
+        return accept
 
     async def _handle_task_submit(self, envelope: LdpEnvelope) -> LdpEnvelope:
         body = envelope.body
@@ -245,6 +313,7 @@ class LdpDelegate(ABC):
         )
 
     def _handle_session_close(self, envelope: LdpEnvelope) -> LdpEnvelope:
+        self.on_session_end(envelope.session_id, envelope.body.reason or "")
         return LdpEnvelope.create(
             session_id=envelope.session_id,
             from_id=self.identity.delegate_id,
@@ -272,7 +341,9 @@ class LdpDelegate(ABC):
         delegate = self
 
         async def handle_identity(request: Request) -> JSONResponse:
-            return JSONResponse(identity.model_dump())
+            # Serve the honest, advertised view (modes narrowed to installed
+            # codecs) so discovery agrees with what negotiation will accept.
+            return JSONResponse(delegate.advertised_identity().model_dump())
 
         async def handle_capabilities(request: Request) -> JSONResponse:
             caps = [c.model_dump() for c in identity.capabilities]

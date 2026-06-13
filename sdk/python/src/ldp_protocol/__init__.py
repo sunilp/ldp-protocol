@@ -30,6 +30,8 @@ from ldp_protocol.types import (
     SessionState,
     TrustDomain,
     VerificationStatus,
+    negotiate_payload_mode,
+    register_payload_mode,
 )
 from ldp_protocol.client import ContractViolationError, LdpClient
 from ldp_protocol.delegate import LdpDelegate
@@ -57,6 +59,8 @@ __all__ = [
     "ProvenanceEntry",
     "PayloadMode",
     "NegotiatedPayload",
+    "negotiate_payload_mode",
+    "register_payload_mode",
     "SessionConfig",
     "SessionState",
     "LdpSession",
