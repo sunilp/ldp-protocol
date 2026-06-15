@@ -1,5 +1,8 @@
 """Tests for LDP protocol types."""
 
+import pytest
+from pydantic import ValidationError
+
 from ldp_protocol.types import (
     LdpCapability,
     LdpEnvelope,
@@ -9,6 +12,7 @@ from ldp_protocol.types import (
     Provenance,
     QualityMetrics,
     SessionConfig,
+    SessionProposeConfig,
     TrustDomain,
     negotiate_payload_mode,
     register_payload_mode,
@@ -619,7 +623,9 @@ class TestMessagesAdvanced:
         types_list = [
             LdpMessageBody.hello("id", [PayloadMode.TEXT]),
             LdpMessageBody.capability_manifest({"caps": []}),
-            LdpMessageBody.session_propose({"ttl": 3600}),
+            LdpMessageBody.session_propose(
+                {"preferred_payload_modes": ["text"], "trust_domain": "default"}
+            ),
             LdpMessageBody.session_accept("s1", PayloadMode.TEXT),
             LdpMessageBody.session_reject("no"),
             LdpMessageBody.task_submit("t1", "echo", {"data": 1}),
@@ -715,3 +721,114 @@ class TestProvenanceVerification:
         p = Provenance.model_validate(old)
         assert p.verification_status == VerificationStatus.UNVERIFIED
         assert p.lineage == []
+
+
+class TestSessionProposeConfig:
+    """The typed SESSION_PROPOSE config (issue #18): strict trust_domain,
+    tolerant payload-mode handling so forward-compat peers still negotiate."""
+
+    def test_valid_config(self):
+        c = SessionProposeConfig(
+            preferred_payload_modes=[PayloadMode.SEMANTIC_GRAPH, PayloadMode.TEXT],
+            ttl_secs=120,
+            trust_domain="default",
+        )
+        assert c.preferred_payload_modes == [PayloadMode.SEMANTIC_GRAPH, PayloadMode.TEXT]
+        assert c.ttl_secs == 120
+        assert c.trust_domain == "default"
+
+    def test_trust_domain_is_required(self):
+        with pytest.raises(ValidationError):
+            SessionProposeConfig(preferred_payload_modes=[PayloadMode.TEXT])
+
+    def test_string_modes_are_coerced(self):
+        c = SessionProposeConfig(
+            preferred_payload_modes=["semantic_graph", "text"], trust_domain="d"
+        )
+        assert c.preferred_payload_modes == [PayloadMode.SEMANTIC_GRAPH, PayloadMode.TEXT]
+
+    def test_unknown_modes_are_dropped(self):
+        # Forward-compat: a peer on a newer mode set must not fail the handshake.
+        c = SessionProposeConfig(
+            preferred_payload_modes=["wormhole_mode", "semantic_graph", "text"],
+            trust_domain="d",
+        )
+        assert c.preferred_payload_modes == [PayloadMode.SEMANTIC_GRAPH, PayloadMode.TEXT]
+
+    def test_non_string_items_are_dropped(self):
+        c = SessionProposeConfig(
+            preferred_payload_modes=[{"mode": "semantic_graph"}, ["text"], 3, "text"],
+            trust_domain="d",
+        )
+        assert c.preferred_payload_modes == [PayloadMode.TEXT]
+
+    def test_non_list_modes_becomes_empty(self):
+        c = SessionProposeConfig(preferred_payload_modes=3, trust_domain="d")
+        assert c.preferred_payload_modes == []
+
+    def test_modes_default_to_empty(self):
+        assert SessionProposeConfig(trust_domain="d").preferred_payload_modes == []
+
+    def test_parses_through_envelope_boundary(self):
+        # The point of #18: a malformed-but-tolerable config validates at the
+        # wire boundary, dropping the unknown mode rather than crashing.
+        env = LdpEnvelope.create(
+            "s1",
+            "client",
+            "delegate",
+            body=LdpMessageBody.session_propose(
+                {"preferred_payload_modes": ["bogus", "text"], "trust_domain": "default"}
+            ),
+        )
+        parsed = LdpEnvelope.model_validate(env.model_dump(by_alias=True))
+        assert parsed.body.config is not None
+        assert parsed.body.config.preferred_payload_modes == [PayloadMode.TEXT]
+        assert parsed.body.config.trust_domain == "default"
+
+    def test_envelope_missing_trust_domain_is_rejected(self):
+        # Composes with #19: this raises at the wire boundary, and the HTTP
+        # route maps the ValidationError to a 400 rather than a 500.
+        wire = {
+            "session_id": "s1",
+            "from": "client",
+            "to": "delegate",
+            "body": {"type": "SESSION_PROPOSE", "config": {"preferred_payload_modes": ["text"]}},
+        }
+        with pytest.raises(ValidationError):
+            LdpEnvelope.model_validate(wire)
+
+    def test_blank_trust_domain_is_rejected(self):
+        # A blank or whitespace-only trust_domain must not slip through the typed
+        # boundary and reach the trust check as "" — reject it as malformed,
+        # mirroring TrustDomain.name's own non-blank rule.
+        with pytest.raises(ValidationError):
+            SessionProposeConfig(trust_domain="")
+        with pytest.raises(ValidationError):
+            SessionProposeConfig(trust_domain="   \t")
+
+    def test_non_positive_ttl_is_rejected(self):
+        with pytest.raises(ValidationError):
+            SessionProposeConfig(trust_domain="d", ttl_secs=0)
+        with pytest.raises(ValidationError):
+            SessionProposeConfig(trust_domain="d", ttl_secs=-1)
+
+    def test_factory_dict_missing_trust_domain_raises(self):
+        # The session_propose(dict) convenience path coerces + validates on
+        # construction, so the missing-trust_domain contract holds there too.
+        with pytest.raises(ValidationError):
+            LdpMessageBody.session_propose({"preferred_payload_modes": ["text"]})
+
+    def test_session_propose_requires_config(self):
+        # trust_domain-required, enforced end to end: a config-less SESSION_PROPOSE
+        # is rejected at the wire boundary (becomes a 400 via the route), instead
+        # of silently negotiating as the "unknown" trust domain.
+        with pytest.raises(ValidationError):
+            LdpMessageBody(type="SESSION_PROPOSE")
+        wire = {
+            "session_id": "s1",
+            "from": "client",
+            "to": "delegate",
+            "body": {"type": "SESSION_PROPOSE"},
+        }
+        with pytest.raises(ValidationError):
+            LdpEnvelope.model_validate(wire)

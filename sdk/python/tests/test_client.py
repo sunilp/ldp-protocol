@@ -56,7 +56,7 @@ def _stub_network(
 
 def _proposed_modes(sent: list) -> list[str]:
     propose = next(e for e in sent if e.body.type == "SESSION_PROPOSE")
-    return propose.body.config["preferred_payload_modes"]
+    return [m.value for m in propose.body.config.preferred_payload_modes]
 
 
 def _client() -> LdpClient:

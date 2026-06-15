@@ -6,12 +6,53 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from ldp_protocol.types.contract import DelegationContract
 from ldp_protocol.types.error import LdpError
 from ldp_protocol.types.payload import PayloadMode
 from ldp_protocol.types.provenance import Provenance
+
+
+class SessionProposeConfig(BaseModel):
+    """Typed, validated body of a SESSION_PROPOSE message.
+
+    Replaces the former ``config: dict[str, Any]`` hatch so Pydantic enforces
+    the wire shape at the boundary (issue #18). ``trust_domain`` is required and
+    non-blank; ``ttl_secs``, when present, must be positive;
+    ``preferred_payload_modes`` is tolerant of forward-compat peers — unknown or
+    malformed mode entries are dropped rather than failing the whole handshake,
+    so a peer on a newer mode set still negotiates down to a shared known mode.
+    """
+
+    preferred_payload_modes: list[PayloadMode] = Field(default_factory=list)
+    ttl_secs: int | None = Field(default=None, gt=0)
+    trust_domain: str
+
+    @field_validator("trust_domain")
+    @classmethod
+    def _trust_domain_not_blank(cls, value: str) -> str:
+        # Mirror TrustDomain.name: a blank or whitespace-only domain must not
+        # slip through the typed boundary and reach the trust check as "".
+        if not value.strip():
+            raise ValueError("trust_domain must not be blank")
+        return value
+
+    @field_validator("preferred_payload_modes", mode="before")
+    @classmethod
+    def _drop_unrecognized_modes(cls, value: Any) -> Any:
+        # Untrusted wire input. A non-list means "no preference expressed"; any
+        # unknown / forward-compat / non-string item is dropped so a newer peer
+        # degrades to the shared known modes instead of failing validation.
+        # Recognised values fall through to normal PayloadMode coercion.
+        if not isinstance(value, list):
+            return []
+        known = {mode.value for mode in PayloadMode}
+        return [
+            item
+            for item in value
+            if isinstance(item, PayloadMode) or (isinstance(item, str) and item in known)
+        ]
 
 
 class LdpMessageBody(BaseModel):
@@ -27,7 +68,7 @@ class LdpMessageBody(BaseModel):
     capabilities: Any | None = None
 
     # SESSION_PROPOSE
-    config: dict[str, Any] | None = None
+    config: SessionProposeConfig | None = None
 
     # SESSION_ACCEPT
     session_id: str | None = None
@@ -58,6 +99,16 @@ class LdpMessageBody(BaseModel):
     claim: Any | None = None
     evidence: Any | None = None
 
+    @model_validator(mode="after")
+    def _require_config_for_session_propose(self) -> LdpMessageBody:
+        # A SESSION_PROPOSE must carry a config (and therefore a trust_domain):
+        # a config-less proposal is rejected at the wire boundary as malformed
+        # rather than silently negotiating as the "unknown" trust domain. Keeps
+        # the trust_domain-required contract honest end to end (issue #18).
+        if self.type == "SESSION_PROPOSE" and self.config is None:
+            raise ValueError("SESSION_PROPOSE requires a config with a trust_domain")
+        return self
+
     @classmethod
     def hello(cls, delegate_id: str, supported_modes: list[PayloadMode]) -> LdpMessageBody:
         return cls(type="HELLO", delegate_id=delegate_id, supported_modes=supported_modes)
@@ -67,7 +118,8 @@ class LdpMessageBody(BaseModel):
         return cls(type="CAPABILITY_MANIFEST", capabilities=capabilities)
 
     @classmethod
-    def session_propose(cls, config: dict[str, Any]) -> LdpMessageBody:
+    def session_propose(cls, config: SessionProposeConfig | dict[str, Any]) -> LdpMessageBody:
+        # A dict is coerced to SessionProposeConfig (and validated) on construction.
         return cls(type="SESSION_PROPOSE", config=config)
 
     @classmethod

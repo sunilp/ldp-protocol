@@ -43,7 +43,7 @@
       "config": {
         "preferred_payload_modes": ["semantic_frame", "text"],
         "ttl_secs": 3600,
-        "required_trust_domain": "research.internal"
+        "trust_domain": "research.internal"
       }
     },
     "payload_mode": "text",

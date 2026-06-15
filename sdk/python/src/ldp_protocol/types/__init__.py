@@ -19,7 +19,7 @@ from ldp_protocol.types.identity import LdpIdentityCard
 from ldp_protocol.types.provenance import Provenance
 from ldp_protocol.types.verification import EvidenceRef, ProvenanceEntry, VerificationStatus
 from ldp_protocol.types.session import LdpSession, SessionConfig, SessionState
-from ldp_protocol.types.messages import LdpEnvelope, LdpMessageBody
+from ldp_protocol.types.messages import LdpEnvelope, LdpMessageBody, SessionProposeConfig
 
 __all__ = [
     "PayloadMode",
@@ -47,4 +47,5 @@ __all__ = [
     "SessionState",
     "LdpEnvelope",
     "LdpMessageBody",
+    "SessionProposeConfig",
 ]

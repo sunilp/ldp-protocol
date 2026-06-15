@@ -210,11 +210,25 @@ class LdpDelegate(ABC):
         )
 
     def _handle_session_propose(self, envelope: LdpEnvelope) -> LdpEnvelope:
-        # Validate trust domain
-        remote_domain = "unknown"
-        if envelope.body.config and "trust_domain" in envelope.body.config:
-            remote_domain = envelope.body.config["trust_domain"]
+        # `config` is a typed SessionProposeConfig, validated at the wire
+        # boundary (issue #18): trust_domain and preferred_payload_modes are
+        # already well-formed here, and LdpMessageBody's validator guarantees
+        # config is present for SESSION_PROPOSE (the forward-compat tolerance the
+        # old dict[str, Any] guards provided now lives in the model). The guard
+        # below is a fail-safe backstop for that invariant — fail closed on
+        # trust rather than assume an "unknown" domain.
+        config = envelope.body.config
+        if config is None:
+            return LdpEnvelope.create(
+                session_id=envelope.session_id,
+                from_id=self.identity.delegate_id,
+                to_id=envelope.from_,
+                body=LdpMessageBody.session_reject(
+                    reason="SESSION_PROPOSE requires a config with a trust_domain"
+                ),
+            )
 
+        remote_domain = config.trust_domain
         if not self.identity.trust_domain.trusts(remote_domain):
             return LdpEnvelope.create(
                 session_id=envelope.session_id,
@@ -226,21 +240,7 @@ class LdpDelegate(ABC):
             )
 
         session_id = str(uuid4())
-        # Negotiate payload mode. `config` is untrusted wire input
-        # (dict[str, Any], unvalidated), so both the preferred-modes list AND its
-        # items may be malformed. Treat a non-list as "no preference expressed"
-        # and drop non-string / unknown / forward-compat items, so a Mode-3-aware
-        # peer and an older peer still negotiate down to a shared known mode
-        # instead of crashing the handler — a non-iterable would raise on
-        # iteration, and an unhashable item would raise on the membership check.
-        initiator_modes = []
-        if envelope.body.config:
-            raw_modes = envelope.body.config.get("preferred_payload_modes")
-            if isinstance(raw_modes, list):
-                valid_modes = {mode.value for mode in PayloadMode}
-                initiator_modes = [
-                    PayloadMode(m) for m in raw_modes if isinstance(m, str) and m in valid_modes
-                ]
+        initiator_modes = config.preferred_payload_modes
         negotiated = negotiate_payload_mode(
             initiator_modes, self.identity.advertised_payload_modes()
         )
