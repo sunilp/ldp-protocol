@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from ldp_protocol.types.capability import LdpCapability
@@ -14,6 +15,9 @@ from ldp_protocol.types.payload import NegotiatedPayload, PayloadMode, negotiate
 from ldp_protocol.types.provenance import Provenance
 from ldp_protocol.types.trust import TrustDomain
 from ldp_protocol.types.verification import VerificationStatus
+
+if TYPE_CHECKING:
+    from starlette.applications import Starlette
 
 
 class LdpDelegate(ABC):
@@ -321,8 +325,12 @@ class LdpDelegate(ABC):
             body=LdpMessageBody.session_close(reason="acknowledged"),
         )
 
-    def run(self, host: str = "0.0.0.0", port: int = 8090) -> None:
-        """Run the delegate as an HTTP server using Starlette + uvicorn.
+    def _build_app(self) -> "Starlette":
+        """Build the Starlette ASGI app that exposes this delegate over HTTP.
+
+        Separated from ``run`` so the routes — in particular the envelope
+        parsing in ``/ldp/messages`` — can be exercised with a test client
+        without binding a socket.
 
         Requires: pip install ldp-protocol[server]
         """
@@ -331,14 +339,22 @@ class LdpDelegate(ABC):
             from starlette.requests import Request
             from starlette.responses import JSONResponse
             from starlette.routing import Route
-            import uvicorn
         except ImportError:
-            raise ImportError(
-                "Server dependencies not installed. Run: pip install ldp-protocol[server]"
-            )
+            raise ImportError("Starlette is not installed. Run: pip install ldp-protocol[server]")
+
+        from pydantic import ValidationError
 
         identity = self.identity
         delegate = self
+
+        def _bad_request(message: str) -> JSONResponse:
+            # A malformed request is the peer's error, not ours: answer with a
+            # structured LDP error at 400 rather than leaking the parse failure
+            # as an unhandled 500.
+            return JSONResponse(
+                {"error": LdpError.transport("MALFORMED_ENVELOPE", message).model_dump()},
+                status_code=400,
+            )
 
         async def handle_identity(request: Request) -> JSONResponse:
             # Serve the honest, advertised view (modes narrowed to installed
@@ -350,12 +366,24 @@ class LdpDelegate(ABC):
             return JSONResponse({"capabilities": caps})
 
         async def handle_messages(request: Request) -> JSONResponse:
-            data = await request.json()
-            envelope = LdpEnvelope.model_validate(data)
+            # Parse the envelope defensively. Bad JSON (JSONDecodeError) or a bad
+            # encoding (UnicodeDecodeError) is the peer's fault → 400; a malformed
+            # but well-encoded envelope raises ValidationError → 400. Anything
+            # else (a server/transport fault, or a bug inside handle_message)
+            # propagates as a 500 — it is ours, not the peer's, and must stay
+            # observable rather than be mislabelled a bad request.
+            try:
+                data = await request.json()
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                return _bad_request("Request body is not valid JSON")
+            try:
+                envelope = LdpEnvelope.model_validate(data)
+            except ValidationError:
+                return _bad_request("Request body is not a valid LDP envelope")
             response = await delegate.handle_message(envelope)
             return JSONResponse(response.model_dump(by_alias=True))
 
-        app = Starlette(
+        return Starlette(
             routes=[
                 Route("/.well-known/ldp-identity", handle_identity, methods=["GET"]),
                 Route("/ldp/identity", handle_identity, methods=["GET"]),
@@ -364,6 +392,18 @@ class LdpDelegate(ABC):
             ],
         )
 
+    def run(self, host: str = "0.0.0.0", port: int = 8090) -> None:
+        """Run the delegate as an HTTP server using Starlette + uvicorn.
+
+        Requires: pip install ldp-protocol[server]
+        """
+        try:
+            import uvicorn
+        except ImportError:
+            raise ImportError("uvicorn is not installed. Run: pip install ldp-protocol[server]")
+
+        app = self._build_app()
+        identity = self.identity
         self.identity.endpoint = f"http://{host}:{port}"
         print(f"LDP Delegate '{identity.name}' starting on {host}:{port}")
         print(f"  ID: {identity.delegate_id}")
